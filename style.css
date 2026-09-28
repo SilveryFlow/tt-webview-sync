@@ -1,30 +1,50 @@
 /* WebView 存储同步器 — 面板样式（贴合 ST/TT 原生观感） */
+
+/* ---- 按钮网格 ---- */
 #webview-sync-panel .ws-actions {
-  display: flex;
+  display: grid;
   gap: 8px;
-  flex-wrap: wrap;
-  align-items: center;
 }
+#webview-sync-panel .ws-grid2 { grid-template-columns: 1fr 1fr; }
+#webview-sync-panel .ws-grid3 { grid-template-columns: 1fr 1fr 1fr; }
 #webview-sync-panel .ws-actions .menu_button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  width: auto;
-  min-width: 0;
-  max-width: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 6px 8px;
   white-space: nowrap;
   word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+#webview-sync-panel .ws-primary { font-weight: 700; }
+#webview-sync-panel .ws-danger:hover { color: var(--fullred, #c4545b); border-color: var(--fullred, #c4545b); }
+
+/* ---- 状态条 ---- */
+#webview-sync-panel .ws-status {
+  margin: 0;
+  white-space: normal;
+  word-break: break-all;
+  display: block;
+  text-align: left;
+  font-size: 0.85em;
+}
+
+/* ---- 区块标题 ---- */
 #webview-sync-panel .ws-sec {
   font-weight: 700;
   font-size: 0.9em;
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 4px;
+  margin: 4px 0;
 }
 #webview-sync-panel .ws-sec .ws-sub { font-weight: 400; opacity: 0.55; font-size: 0.85em; }
+
+/* ---- 发现清单 ---- */
 #webview-sync-panel .ws-list {
   max-height: 180px;
   overflow-y: auto;
@@ -46,5 +66,26 @@
   line-height: 1.4;
 }
 #webview-sync-panel .ws-item:hover .ws-name { text-decoration: underline; }
-#webview-sync-panel .ws-info { opacity: 0.5; font-size: 0.9em; margin-left: auto; }
+#webview-sync-panel .ws-info { opacity: 0.5; font-size: 0.9em; margin-left: auto; flex: 0 0 auto; }
 #webview-sync-panel .ws-name { flex: 0 1 auto; }
+#webview-sync-panel .ws-list:empty::after {
+  content: '(空)';
+  opacity: 0.4;
+  font-size: 0.85em;
+  padding: 2px 4px;
+}
+
+/* ---- 底部选项行 ---- */
+#webview-sync-panel .ws-options {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+#webview-sync-panel .ws-options .checkbox_label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}

@@ -361,25 +361,27 @@
           <div class="inline-drawer-content" style="display:none;">
             <div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
 
-              <div class="ws-actions">
-                <button type="button" class="menu_button" data-act="export">
+              <div class="ws-actions ws-grid2">
+                <button type="button" class="menu_button ws-primary" data-act="export">
                   <i class="fa-solid fa-cloud-arrow-up"></i><span>导出镜像到同步</span>
                 </button>
                 <button type="button" class="menu_button" data-act="import">
                   <i class="fa-solid fa-cloud-arrow-down"></i><span>从镜像恢复(强制)</span>
                 </button>
+              </div>
+              <div class="ws-actions ws-grid3">
                 <button type="button" class="menu_button" data-act="scan">
                   <i class="fa-solid fa-rotate"></i><span>重新扫描</span>
-                </button>
-                <button type="button" class="menu_button" data-act="wipe">
-                  <i class="fa-solid fa-trash-can"></i><span>删除云端镜像</span>
                 </button>
                 <button type="button" class="menu_button" data-act="log">
                   <i class="fa-solid fa-file-export"></i><span>导出日志</span>
                 </button>
+                <button type="button" class="menu_button ws-danger" data-act="wipe">
+                  <i class="fa-solid fa-trash-can"></i><span>删除镜像</span>
+                </button>
               </div>
 
-              <div class="ws-status text_pole" style="margin:0; white-space:normal; word-break:break-all; display:block; text-align:left;">尚无镜像</div>
+              <div class="ws-status text_pole">尚无镜像</div>
 
               <div>
                 <div class="ws-sec"><i class="fa-solid fa-database"></i> IndexedDB 库 <small class="ws-sub ws-dbmeta">（扫描中…）</small></div>
@@ -391,11 +393,11 @@
                 <div class="ws-list ws-lslist"></div>
               </div>
 
-              <div class="ws-actions" style="justify-content: space-between;">
-                <label class="checkbox_label" style="display:flex;align-items:center;gap:6px;margin:0;">
+              <div class="ws-options">
+                <label class="checkbox_label">
                   <input type="checkbox" class="ws-auto"><span>随设置保存自动导出</span>
                 </label>
-                <label class="checkbox_label" style="display:flex;align-items:center;gap:6px;margin:0;">
+                <label class="checkbox_label">
                   <span>单文件上限(KB)</span>
                   <input type="number" class="ws-limit text_pole" style="width:70px;" min="0">
                 </label>

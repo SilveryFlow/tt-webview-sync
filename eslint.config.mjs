@@ -13,6 +13,8 @@ export default [
         URL: 'readonly', Blob: 'readonly', FileReader: 'readonly',
         atob: 'readonly', btoa: 'readonly', clearTimeout: 'readonly', setTimeout: 'readonly', unescape: 'readonly',
         encodeURIComponent: 'readonly', Uint8Array: 'readonly', ArrayBuffer: 'readonly',
+        TextEncoder: 'readonly', TextDecoder: 'readonly',
+        CompressionStream: 'readonly', DecompressionStream: 'readonly',
       },
     },
     rules: {

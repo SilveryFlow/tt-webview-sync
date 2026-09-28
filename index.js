@@ -478,10 +478,29 @@
     $('.ws-auto').checked = !!s.autoExportOnSave;
     $('.ws-auto').addEventListener('change', (e) => { s.autoExportOnSave = e.target.checked; });
 
+    let busy = false;
     div.addEventListener('click', async (e) => {
       const act = e.target?.closest('[data-act]')?.dataset?.act;
       if (!act) return;
-      if (act === 'export') { const v = await exportMirror(); refresh(); alert('镜像已导出 v' + v + (skipped.length ? '\n跳过 ' + skipped.length + ' 个大文件' : '')); }
+      if (act === 'log') { exportLog(); return; }
+      if (busy) { alert('[WebView同步] 上一个操作还在进行中，请等它完成'); return; }
+      if (act === 'export') {
+        busy = true;
+        const btn = div.querySelector('[data-act="export"]');
+        const old = btn ? btn.innerHTML : null;
+        if (btn) btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>导出中...</span>';
+        try {
+          const v = await exportMirror(); await refresh();
+          alert('镜像已导出 v' + v + (skipped.length ? '\n跳过 ' + skipped.length + ' 个大文件' : ''));
+        } catch (err) {
+          console.error('[webview-sync] 导出失败', err);
+          record('ERROR', ['导出失败:', err]);
+          alert('导出失败: ' + (err?.message || err) + '\n请点「导出日志」并把文件发给开发者');
+        } finally {
+          if (btn && old) btn.innerHTML = old;
+          busy = false;
+        }
+      }
       if (act === 'import') {
         const v = await importMirror(true);
         refresh();

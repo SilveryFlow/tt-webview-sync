@@ -6,7 +6,7 @@
     "js": "index.js",
     "css": "style.css",
     "author": "zcode",
-    "version": "0.7.0",
+    "version": "0.7.1",
     "homePage": "https://github.com/SilveryFlow/tt-webview-sync",
     "auto_update": true
 }

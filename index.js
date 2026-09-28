@@ -238,25 +238,79 @@
 
   async function buildPanel() {
     const s = getSettings(); if (!s) return;
-    const div = document.createElement('div');
-    div.className = 'webview-sync-panel';
-    div.innerHTML = `
-      <div class="webview-sync-title">WebView 存储同步器 <span class="ws-dev">${s.deviceId}</span></div>
-      <div class="ws-row">
-        <button class="ws-btn" data-act="export">导出镜像到同步</button>
-        <button class="ws-btn" data-act="import">从镜像恢复(强制)</button>
-        <button class="ws-btn" data-act="scan">重新扫描存储</button>
-      </div>
-      <div class="ws-status"></div>
-      <div class="ws-sec">IndexedDB 库（动态发现，勾选=同步）</div>
-      <div class="ws-list ws-dblist"></div>
-      <div class="ws-sec">localStorage 键（动态发现，勾选=同步）</div>
-      <div class="ws-list ws-lslist"></div>
-      <div class="ws-row"><label>单文件上限(KB,0=不限) <input type="number" class="ws-limit" style="width:80px" min="0"></label></div>
-      <div class="ws-row"><label><input type="checkbox" class="ws-auto"> 随设置保存自动导出</label></div>
-    `;
+
+    const html = `
+      <div id="webview-sync-panel" class="extension_settings">
+        <div class="inline-drawer">
+          <div class="inline-drawer-toggle inline-drawer-header">
+            <b>WebView 存储同步器</b>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down"></div>
+          </div>
+          <div class="inline-drawer-content" style="display:none;">
+            <div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+
+              <div class="ws-actions">
+                <button type="button" class="menu_button" data-act="export">
+                  <i class="fa-solid fa-cloud-arrow-up"></i><span>导出镜像到同步</span>
+                </button>
+                <button type="button" class="menu_button" data-act="import">
+                  <i class="fa-solid fa-cloud-arrow-down"></i><span>从镜像恢复(强制)</span>
+                </button>
+                <button type="button" class="menu_button" data-act="scan">
+                  <i class="fa-solid fa-rotate"></i><span>重新扫描</span>
+                </button>
+              </div>
+
+              <div class="ws-status text_pole" style="margin:0; white-space:normal; word-break:break-all; display:block; text-align:left;">尚无镜像</div>
+
+              <div>
+                <div class="ws-sec"><i class="fa-solid fa-database"></i> IndexedDB 库 <small class="ws-sub">（动态发现 · 勾选=同步）</small></div>
+                <div class="ws-list ws-dblist"></div>
+              </div>
+
+              <div>
+                <div class="ws-sec"><i class="fa-solid fa-key"></i> localStorage <small class="ws-sub">（动态发现 · 勾选=同步）</small></div>
+                <div class="ws-list ws-lslist"></div>
+              </div>
+
+              <div class="ws-actions" style="justify-content: space-between;">
+                <label class="checkbox_label" style="display:flex;align-items:center;gap:6px;margin:0;">
+                  <input type="checkbox" class="ws-auto"><span>随设置保存自动导出</span>
+                </label>
+                <label class="checkbox_label" style="display:flex;align-items:center;gap:6px;margin:0;">
+                  <span>单文件上限(KB)</span>
+                  <input type="number" class="ws-limit text_pole" style="width:70px;" min="0">
+                </label>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>`;
+
+    const container = document.getElementById('extensions_settings') || document.getElementById('extensions_settings2');
+    if (!container) return setTimeout(() => buildPanel(), 1000);
+    const old = document.getElementById('webview-sync-panel'); old?.remove();
+    container.insertAdjacentHTML('beforeend', html);
+
+    const div = document.getElementById('webview-sync-panel');
     const $ = (q) => div.querySelector(q);
     const $st = $('.ws-status'), $dbl = $('.ws-dblist'), $lsl = $('.ws-lslist');
+
+    // 折叠开合（学玉子面板）
+    const $header = $(`#${'webview-sync-panel'} .inline-drawer-header`); // eslint-disable-line
+    const hdr = div.querySelector('.inline-drawer-header');
+    const content = div.querySelector('.inline-drawer-content');
+    const icon = div.querySelector('.inline-drawer-icon');
+    hdr.addEventListener('click', (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (window.jQuery) {
+        if (content.style.display === 'none') { window.jQuery(content).slideDown(200); icon.className = 'inline-drawer-icon fa-solid fa-circle-chevron-up'; }
+        else { window.jQuery(content).slideUp(200); icon.className = 'inline-drawer-icon fa-solid fa-circle-chevron-down'; }
+      } else {
+        content.style.display = content.style.display === 'none' ? '' : 'none';
+      }
+    });
 
     async function renderLists() {
       const names = await discoverDbs();
@@ -291,7 +345,7 @@
     const refresh = () => {
       const m = s.mirror;
       $st.textContent = m
-        ? `镜像: v${m.version} @${m.device} | 库:${Object.keys(m.dbs || {}).length} ls:${Object.keys(m.ls || {}).length} | 跳过:${(m.skipped || []).length} | 已导入:${s.lastImportedVersion || '无'}`
+        ? `镜像 v${m.version} @${m.device} · 库 ${Object.keys(m.dbs || {}).length} · ls ${Object.keys(m.ls || {}).length} · 跳过 ${(m.skipped || []).length} · 已导入 ${s.lastImportedVersion || '无'}`
         : '尚无镜像';
     };
     refresh();
@@ -301,20 +355,14 @@
     $('.ws-auto').addEventListener('change', (e) => { s.autoExportOnSave = e.target.checked; });
 
     div.addEventListener('click', async (e) => {
-      const act = e.target?.dataset?.act;
+      const act = e.target?.closest('[data-act]')?.dataset?.act;
       if (!act) return;
-      if (act === 'export') { const v = await exportMirror(); refresh(); alert('镜像已导出 v' + v + (skipped.length ? `\n跳过 ${skipped.length} 个大文件` : '')); }
+      if (act === 'export') { const v = await exportMirror(); refresh(); alert('镜像已导出 v' + v + (skipped.length ? '\n跳过 ' + skipped.length + ' 个大文件' : '')); }
       if (act === 'import') { const v = await importMirror(true); refresh(); alert('已从镜像恢复 v' + v + '\n建议重启 TT 让各扩展重载'); }
       if (act === 'scan') { await renderLists(); alert('已重新扫描'); }
     });
 
-    const mount = () => {
-      const host = document.getElementById('extensions_settings') || document.getElementById('extensions_settings2');
-      if (!host) return setTimeout(mount, 1000);
-      host.appendChild(div);
-      renderLists();
-    };
-    mount();
+    renderLists();
   }
 
   // ---------- 启动 ----------

@@ -1,20 +1,50 @@
-.webview-sync-panel {
-  border: 1px solid var(--SmartThemeBorderColor, #666);
-  border-radius: 8px;
-  padding: 10px;
-  margin: 8px 0;
+/* WebView 存储同步器 — 面板样式（贴合 ST/TT 原生观感） */
+#webview-sync-panel .ws-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+#webview-sync-panel .ws-actions .menu_button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+#webview-sync-panel .ws-sec {
+  font-weight: 700;
+  font-size: 0.9em;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+#webview-sync-panel .ws-sec .ws-sub { font-weight: 400; opacity: 0.55; font-size: 0.85em; }
+#webview-sync-panel .ws-list {
+  max-height: 180px;
+  overflow-y: auto;
+  border: 1px solid var(--SmartThemeBorderColor, #555);
+  border-radius: 10px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 3px;
+  background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 55%, transparent);
 }
-.webview-sync-title { font-weight: 700; }
-.ws-dev { font-size: .8em; opacity: .6; margin-left: 6px; }
-.ws-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-.ws-btn { cursor: pointer; }
-.ws-status { font-size: .85em; opacity: .8; word-break: break-all; }
-.ws-dbs { width: 100%; font-family: monospace; font-size: .85em; }
-.ws-sec { font-weight: 700; font-size: .85em; margin-top: 4px; }
-.ws-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--SmartThemeBorderColor,#555); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; }
-.ws-item { display: flex; gap: 6px; align-items: baseline; font-size: .8em; cursor: pointer; word-break: break-all; }
-.ws-name { }
-.ws-info { opacity: .55; font-size: .9em; }
+#webview-sync-panel .ws-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 0.8em;
+  cursor: pointer;
+  word-break: break-all;
+  line-height: 1.4;
+}
+#webview-sync-panel .ws-item:hover .ws-name { text-decoration: underline; }
+#webview-sync-panel .ws-info { opacity: 0.5; font-size: 0.9em; margin-left: auto; }
+#webview-sync-panel .ws-name { flex: 0 1 auto; }

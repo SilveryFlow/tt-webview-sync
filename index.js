@@ -43,15 +43,38 @@
   }
 
   // ---------- 动态发现 ----------
+  // databases() 不可用/返回空时的探活兜底清单（历史实证过的库）
+  const KNOWN_DBS = [
+    'yuzi-phone-qq-v2', 'yuzi-phone-appearance-assets', 'yuzi-phone-appearance-packs',
+    'yuzi-phone-template-workshop-v2', 'yuzi-phone-table-image-ownership', 'yuzi-phone-cache',
+    'shujuku_v120_config_v1', 'douluo-main-text-assets', 'wn_phone_media_v1',
+    'chatu8_config_images', 'baibai_image_vibes',
+  ];
+  let lastDiscoverMode = '未扫描';
+
+  async function probeDb(name) {
+    try {
+      await new Promise((res, rej) => { const q = indexedDB.open(name); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
+      return true;
+    } catch (_) { return false; }
+  }
+
   async function discoverDbs() {
+    // 首选：原生枚举
     if (typeof indexedDB.databases === 'function') {
       try {
-        const list = await indexedDB.databases();
-        return list.map(d => d.name).filter(Boolean);
-      } catch (e) { warn('databases() 失败', e); }
+        const list = (await indexedDB.databases()).map(d => d.name).filter(Boolean);
+        if (list.length) { lastDiscoverMode = 'databases()'; return list; }
+        lastDiscoverMode = 'databases()空,探活兜底';
+      } catch (e) { lastDiscoverMode = 'databases()异常,探活兜底'; warn('databases() 失败', e); }
+    } else {
+      lastDiscoverMode = '无databases(),探活兜底';
     }
-    warn('环境不支持 indexedDB.databases()，退回已选清单');
-    return Object.keys(getSettings()?.dbPick || {});
+    // 兜底：已知清单 + 已选键 逐个探活
+    const candidates = [...new Set([...KNOWN_DBS, ...Object.keys(getSettings()?.dbPick || {})])];
+    const found = [];
+    for (const n of candidates) if (await probeDb(n)) found.push(n);
+    return found;
   }
 
   function discoverLsKeys() {
@@ -264,7 +287,7 @@
               <div class="ws-status text_pole" style="margin:0; white-space:normal; word-break:break-all; display:block; text-align:left;">尚无镜像</div>
 
               <div>
-                <div class="ws-sec"><i class="fa-solid fa-database"></i> IndexedDB 库 <small class="ws-sub">（动态发现 · 勾选=同步）</small></div>
+                <div class="ws-sec"><i class="fa-solid fa-database"></i> IndexedDB 库 <small class="ws-sub ws-dbmeta">（扫描中…）</small></div>
                 <div class="ws-list ws-dblist"></div>
               </div>
 
@@ -330,6 +353,8 @@
         row.querySelector('input').addEventListener('change', (e) => { s.dbPick[n] = e.target.checked; saveSettingsDebounced(); });
         $dbl.appendChild(row);
       }
+      const $dbMeta = div.querySelector('.ws-dbmeta');
+      if ($dbMeta) $dbMeta.textContent = `（发现 ${names.length} 库 · ${lastDiscoverMode} · 勾选=同步）`;
       $lsl.innerHTML = '';
       const keys = discoverLsKeys().sort();
       for (const k of keys) {
@@ -375,7 +400,12 @@
     setTimeout(() => importMirror(false).then(v => {
       if (v) alert('[WebView同步] 检测到来自其他设备的新镜像(v' + v + ')，已写入本地存储。\n建议重启 TT 让各扩展重新加载。');
     }), 4000);
-    log('已启动(动态收集模式)', s.deviceId);
+    log('已启动(动态收集模式)', s.deviceId,
+        '| databases():', typeof indexedDB.databases,
+        '| localStorage键数:', localStorage.length);
+    if (typeof indexedDB.databases !== 'function') {
+      warn('本环境无 indexedDB.databases()，将使用探活兜底清单');
+    }
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);

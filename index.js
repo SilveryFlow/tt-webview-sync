@@ -952,13 +952,18 @@
         toast("success", "已重新扫描", "");
       }
       if (act === "wipe") {
+        // 先检查有没有镜像,没有就直接提示
+        const m = await fetchManifest();
+        if (!m) {
+          toast("info", "无镜像", "当前没有已导出的镜像文件");
+          return;
+        }
         const okToDelete = await popupConfirm(
           "删除镜像",
-          "删除已导出的全部镜像文件？下次 TT 同步会把删除同步到其他设备，本地 IndexedDB 数据不受影响。",
+          "将删除 user/files 下全部镜像文件（含各库数据与清单）。\n删除会同步到其他设备；本机浏览器存储不受影响。",
         );
         if (!okToDelete) return;
         try {
-          const m = await fetchManifest();
           const files = [];
           for (const ref of Object.values(m?.exports || {})) {
             if (typeof ref === "string") files.push(ref);

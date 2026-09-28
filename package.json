@@ -1,6 +1,6 @@
 {
   "name": "tt-webview-sync",
-  "version": "0.12.2",
+  "version": "0.12.3",
   "private": true,
   "description": "TauriTavern WebView 存储同步器",
   "type": "module",

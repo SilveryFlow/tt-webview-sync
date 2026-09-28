@@ -453,7 +453,11 @@
       const act = e.target?.closest('[data-act]')?.dataset?.act;
       if (!act) return;
       if (act === 'export') { const v = await exportMirror(); refresh(); alert('镜像已导出 v' + v + (skipped.length ? '\n跳过 ' + skipped.length + ' 个大文件' : '')); }
-      if (act === 'import') { const v = await importMirror(true); refresh(); alert('已从镜像恢复 v' + v + '\n建议重启 TT 让各扩展重载'); }
+      if (act === 'import') {
+        const v = await importMirror(true);
+        refresh();
+        if (v && confirm('[WebView同步] 已从镜像恢复 v' + v + '.\n立即刷新界面让各扩展重新加载配置?\n(取消=稍后自行刷新,期间各扩展可能仍用旧数据)')) location.reload();
+      }
       if (act === 'scan') { await renderLists(); alert('已重新扫描'); }
       if (act === 'wipe') {
         if (!confirm('删除已导出的全部镜像文件（user/files 下的 wvs__*.json）？\n下次 TT 同步会把删除同步到其他设备（它们的镜像也会消失，本地 IndexedDB 数据不受影响）。')) return;
@@ -481,7 +485,7 @@
     if (!s.enabled) return log('已停用');
     await buildPanel();
     setTimeout(() => importMirror(false).then(v => {
-      if (v) alert('[WebView同步] 检测到来自其他设备的新镜像(v' + v + ')，已写入本地存储。\n建议重启 TT 让各扩展重新加载。');
+      if (v && confirm('[WebView同步] 检测到来自其他设备的新镜像(v' + v + ')，已写入本地存储。\n立即刷新界面让各扩展重新加载配置？\n（取消=稍后自行刷新，期间各扩展可能仍用旧数据）')) location.reload();
     }), 4000);
     log('已启动(动态收集模式)', s.deviceId,
         '| databases():', typeof indexedDB.databases,

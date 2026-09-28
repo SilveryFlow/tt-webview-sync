@@ -872,15 +872,14 @@
         try {
           const v = await importMirror(true);
           await refresh();
-          if (v)
+          if (v) {
             toast(
               "success",
               "WebView同步",
-              "已从镜像恢复 v" +
-                v +
-                "，本地存储已更新。\n请点击「刷新界面」按钮让各扩展重新加载配置。",
+              "已从镜像恢复 v" + v + "，3 秒后自动刷新界面",
             );
-          else
+            setTimeout(() => location.reload(), 3000);
+          } else
             toast("info", "WebView同步", "无需导入（远端没有比本地新的镜像）");
         } catch (err) {
           console.error("[webview-sync] 恢复失败", err);
@@ -983,10 +982,9 @@
               toast(
                 "success",
                 "WebView同步",
-                "检测到来自其他设备的新镜像(v" +
-                  v +
-                  ")，已写入本地存储。\n请到扩展设置点「刷新界面」让各扩展重新加载配置。",
+                "检测到来自其他设备的新镜像(v" + v + ")，3 秒后自动刷新界面",
               );
+            setTimeout(() => location.reload(), 3000);
           }),
       4000,
     );

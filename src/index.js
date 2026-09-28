@@ -670,6 +670,9 @@
                 <button type="button" class="menu_button" data-act="log">
                   <i class="fa-solid fa-file-export"></i><span>导出日志</span>
                 </button>
+                <button type="button" class="menu_button ws-primary" data-act="reload">
+                  <i class="fa-solid fa-arrows-rotate"></i><span>刷新界面</span>
+                </button>
                 <button type="button" class="menu_button ws-danger" data-act="wipe">
                   <i class="fa-solid fa-trash-can"></i><span>删除镜像</span>
                 </button>
@@ -853,17 +856,13 @@
         try {
           const v = await importMirror(true);
           await refresh();
-          if (
-            v &&
-            confirm(
+          if (v)
+            alert(
               "[WebView同步] 已从镜像恢复 v" +
                 v +
-                ".\n立即刷新界面让各扩展重新加载配置?\n(取消=稍后自行刷新,期间各扩展可能仍用旧数据)",
-            )
-          )
-            location.reload();
-          else if (v) alert("已恢复到 v" + v + ",稍后自行刷新界面即可生效");
-          else alert("无需导入(远端无新镜像)");
+                "，本地存储已更新。\n请点击「刷新界面」按钮让各扩展重新加载配置。",
+            );
+          else alert("无需导入（远端没有比本地新的镜像）");
         } catch (err) {
           console.error("[webview-sync] 恢复失败", err);
           record("ERROR", ["恢复失败:", err]);
@@ -876,6 +875,9 @@
           if (btn && oldHtml) btn.innerHTML = oldHtml;
           busy = false;
         }
+      }
+      if (act === "reload") {
+        location.reload();
       }
       if (act === "scan") {
         await renderLists();
@@ -937,15 +939,12 @@
         importMirror(false)
           .catch((e) => error("启动自动恢复失败:", e))
           .then((v) => {
-            if (
-              v &&
-              confirm(
+            if (v)
+              alert(
                 "[WebView同步] 检测到来自其他设备的新镜像(v" +
                   v +
-                  ")，已写入本地存储。\n立即刷新界面让各扩展重新加载配置？\n（取消=稍后自行刷新，期间各扩展可能仍用旧数据）",
-              )
-            )
-              location.reload();
+                  ")，已写入本地存储。\n请到扩展设置点「刷新界面」让各扩展重新加载配置。",
+              );
           }),
       4000,
     );

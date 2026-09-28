@@ -24,6 +24,7 @@
     dbExclude: [],
     lsExclude: [],
     blobLimitKb: 0, // 单 Blob 上限(KB)，0=不限制
+    dbLimitMb: 50, // 单库序列化后上限(MB)，超过跳过防 JS 字符串爆长(V8 约 512MB)
     autoExportOnSave: false,
     lastImportedVersion: 0,
     lastExportVersion: 0,
@@ -431,7 +432,16 @@
       log("导出库:", name);
       const dump = await exportDb(name);
       const json = JSON.stringify(dump);
-      log("库", name, "序列化完成", Math.round(json.length / 1024), "KB");
+      const kb = Math.round(json.length / 1024);
+      const limitKb = Math.max(0, Number(s.dbLimitMb) || 0) * 1024;
+      if (limitKb > 0 && json.length > limitKb * 1024) {
+        warn(
+          `库 ${name} 序列化后 ${kb}KB 超过单库上限 ${s.dbLimitMb}MB,跳过(面板可调)`,
+        );
+        skipped.push(`db ${name} ${kb}KB`);
+        continue;
+      }
+      log("库", name, "序列化完成", kb, "KB");
       await uploadText(dbFileName(name), json);
       exports[name] = dbFileName(name);
     }

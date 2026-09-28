@@ -11,6 +11,14 @@
 #webview-sync-panel .ws-grid3 {
   grid-template-columns: 1fr 1fr 1fr;
 }
+#webview-sync-panel .ws-grid4 {
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+@media (max-width: 600px) {
+  #webview-sync-panel .ws-grid4 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
 #webview-sync-panel .ws-actions .menu_button {
   display: inline-flex;
   align-items: center;

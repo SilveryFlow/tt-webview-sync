@@ -655,12 +655,15 @@
           <div class="inline-drawer-content" style="display:none;">
             <div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
 
-              <div class="ws-actions ws-grid2">
+              <div class="ws-actions ws-grid3">
                 <button type="button" class="menu_button ws-primary" data-act="export">
-                  <i class="fa-solid fa-cloud-arrow-up"></i><span>导出镜像到同步</span>
+                  <i class="fa-solid fa-cloud-arrow-up"></i><span>导出镜像</span>
                 </button>
                 <button type="button" class="menu_button" data-act="import">
-                  <i class="fa-solid fa-cloud-arrow-down"></i><span>从镜像恢复(强制)</span>
+                  <i class="fa-solid fa-cloud-arrow-down"></i><span>从镜像恢复</span>
+                </button>
+                <button type="button" class="menu_button ws-primary" data-act="reload">
+                  <i class="fa-solid fa-arrows-rotate"></i><span>刷新界面</span>
                 </button>
               </div>
               <div class="ws-actions ws-grid3">
@@ -669,9 +672,6 @@
                 </button>
                 <button type="button" class="menu_button" data-act="log">
                   <i class="fa-solid fa-file-export"></i><span>导出日志</span>
-                </button>
-                <button type="button" class="menu_button ws-primary" data-act="reload">
-                  <i class="fa-solid fa-arrows-rotate"></i><span>刷新界面</span>
                 </button>
                 <button type="button" class="menu_button ws-danger" data-act="wipe">
                   <i class="fa-solid fa-trash-can"></i><span>删除镜像</span>

@@ -13,6 +13,7 @@
   const API_UPLOAD = "/api/files/upload";
   const API_DELETE = "/api/files/delete";
   const FILE_BASE = "/user/files/";
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 单段原始字节(10MB), base64 后约 13MB
 
   const DEFAULTS = {
     enabled: true,
@@ -232,8 +233,11 @@
     if (!r.ok) throw new Error("fetch " + fileName + " -> " + r.status);
     return await r.text();
   }
-  function dbFileName(dbName) {
-    return PREFIX + "db__" + dbName.replace(/[^A-Za-z0-9_.-]/g, "_") + ".json";
+  function dbFileName(dbName, chunk) {
+    const safe = dbName.replace(/[^A-Za-z0-9_.-]/g, "_");
+    return chunk !== undefined
+      ? `${PREFIX}db__${safe}__c${String(chunk).padStart(3, "0")}.json`
+      : `${PREFIX}db__${safe}.json`;
   }
 
   // ---------- 序列化 ----------
@@ -442,8 +446,18 @@
         continue;
       }
       log("库", name, "序列化完成", kb, "KB");
-      await uploadText(dbFileName(name), json);
-      exports[name] = dbFileName(name);
+      if (json.length <= CHUNK_SIZE) {
+        await uploadText(dbFileName(name), json);
+        exports[name] = { file: dbFileName(name), chunks: 0 };
+      } else {
+        const total = Math.ceil(json.length / CHUNK_SIZE);
+        for (let ci = 0; ci < total; ci++) {
+          const part = json.slice(ci * CHUNK_SIZE, (ci + 1) * CHUNK_SIZE);
+          await uploadText(dbFileName(name, ci + 1), part);
+          log(`库 ${name} 分段 ${ci + 1}/${total} 上传完成`);
+        }
+        exports[name] = { file: dbFileName(name, 1), chunks: total };
+      }
     }
     const version = Date.now();
     await uploadText(
@@ -493,10 +507,30 @@
       (m.version <= s.lastImportedVersion || m.version <= s.lastExportVersion)
     )
       return log("无需导入");
-    for (const [name, file] of Object.entries(m.exports || {})) {
+    for (const [name, ref] of Object.entries(m.exports || {})) {
       try {
-        const dump = JSON.parse(await fetchText(file));
-        await importDb(name, dump);
+        let json;
+        if (typeof ref === "string") {
+          json = await fetchText(ref); // v0.7 兼容(旧 manifest 导出值是文件名)
+        } else if (ref.chunks > 1) {
+          const parts = [];
+          for (let ci = 1; ci <= ref.chunks; ci++) {
+            const fn = ref.file.replace(
+              /__c\d+\.json$/,
+              `__c${String(ci).padStart(3, "0")}.json`,
+            );
+            parts.push(await fetchText(fn));
+          }
+          json = parts.join("");
+          log(
+            `库 ${name} 分段 ${ref.chunks} 拼接完成`,
+            Math.round(json.length / 1024),
+            "KB",
+          );
+        } else {
+          json = await fetchText(ref.file);
+        }
+        await importDb(name, JSON.parse(json));
       } catch (e) {
         error("恢复库失败:", name, e);
       }
@@ -743,7 +777,21 @@
           return;
         try {
           const m = await fetchManifest();
-          const files = Object.values(m?.exports || {});
+          const files = [];
+          for (const ref of Object.values(m?.exports || {})) {
+            if (typeof ref === "string") files.push(ref);
+            else {
+              files.push(ref.file.replace(/__c\d+\.json$/, ".json"));
+              for (let ci = 1; ci <= (ref.chunks || 0); ci++) {
+                files.push(
+                  ref.file.replace(
+                    /__c\d+\.json$/,
+                    `__c${String(ci).padStart(3, "0")}.json`,
+                  ),
+                );
+              }
+            }
+          }
           if (m) files.push(MANIFEST_NAME);
           for (const f of files) await deleteText(f);
           s.lastImportedVersion = 0;

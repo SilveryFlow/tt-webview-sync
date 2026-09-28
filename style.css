@@ -5,8 +5,12 @@
   display: grid;
   gap: 8px;
 }
-#webview-sync-panel .ws-grid2 { grid-template-columns: 1fr 1fr; }
-#webview-sync-panel .ws-grid3 { grid-template-columns: 1fr 1fr 1fr; }
+#webview-sync-panel .ws-grid2 {
+  grid-template-columns: 1fr 1fr;
+}
+#webview-sync-panel .ws-grid3 {
+  grid-template-columns: 1fr 1fr 1fr;
+}
 #webview-sync-panel .ws-actions .menu_button {
   display: inline-flex;
   align-items: center;
@@ -20,8 +24,13 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-#webview-sync-panel .ws-primary { font-weight: 700; }
-#webview-sync-panel .ws-danger:hover { color: var(--fullred, #c4545b); border-color: var(--fullred, #c4545b); }
+#webview-sync-panel .ws-primary {
+  font-weight: 700;
+}
+#webview-sync-panel .ws-danger:hover {
+  color: var(--fullred, #c4545b);
+  border-color: var(--fullred, #c4545b);
+}
 
 /* ---- 状态条 ---- */
 #webview-sync-panel .ws-status {
@@ -42,7 +51,11 @@
   gap: 6px;
   margin: 4px 0;
 }
-#webview-sync-panel .ws-sec .ws-sub { font-weight: 400; opacity: 0.55; font-size: 0.85em; }
+#webview-sync-panel .ws-sec .ws-sub {
+  font-weight: 400;
+  opacity: 0.55;
+  font-size: 0.85em;
+}
 
 /* ---- 发现清单 ---- */
 #webview-sync-panel .ws-list {
@@ -54,7 +67,11 @@
   display: flex;
   flex-direction: column;
   gap: 3px;
-  background: color-mix(in srgb, var(--SmartThemeBlurTintColor, #222) 55%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--SmartThemeBlurTintColor, #222) 55%,
+    transparent
+  );
 }
 #webview-sync-panel .ws-item {
   display: flex;
@@ -65,11 +82,20 @@
   word-break: break-all;
   line-height: 1.4;
 }
-#webview-sync-panel .ws-item:hover .ws-name { text-decoration: underline; }
-#webview-sync-panel .ws-info { opacity: 0.5; font-size: 0.9em; margin-left: auto; flex: 0 0 auto; }
-#webview-sync-panel .ws-name { flex: 0 1 auto; }
+#webview-sync-panel .ws-item:hover .ws-name {
+  text-decoration: underline;
+}
+#webview-sync-panel .ws-info {
+  opacity: 0.5;
+  font-size: 0.9em;
+  margin-left: auto;
+  flex: 0 0 auto;
+}
+#webview-sync-panel .ws-name {
+  flex: 0 1 auto;
+}
 #webview-sync-panel .ws-list:empty::after {
-  content: '(空)';
+  content: "(空)";
   opacity: 0.4;
   font-size: 0.85em;
   padding: 2px 4px;

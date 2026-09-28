@@ -1,0 +1,18 @@
+{
+  "name": "tt-webview-sync",
+  "version": "0.7.4",
+  "private": true,
+  "description": "TauriTavern WebView 存储同步器",
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "lint": "eslint src/index.js",
+    "prettier": "prettier --write src/index.js style.css",
+    "release": "node scripts/release.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.0.0"
+  }
+}

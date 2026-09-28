@@ -11,6 +11,7 @@
   const PREFIX = 'wvs__';                       // user/files 下的镜像文件前缀（API 禁止子目录，用前缀代替）
   const MANIFEST_NAME = PREFIX + 'manifest.json';
   const API_UPLOAD = '/api/files/upload';
+  const API_DELETE = '/api/files/delete';
   const FILE_BASE = '/user/files/';
 
   const DEFAULTS = {

@@ -13,7 +13,8 @@
   const API_UPLOAD = "/api/files/upload";
   const API_DELETE = "/api/files/delete";
   const FILE_BASE = "/user/files/";
-  const CHUNK_SIZE = 10 * 1024 * 1024; // 单段原始字节(10MB), base64 后约 13MB
+  const CHUNK_SIZE = 10 * 1024 * 1024; // 单段原始字节(10MB)
+  const GZ_MAGIC = "wvsgz:"; // 压缩文件标记前缀(恢复时识别)
 
   const DEFAULTS = {
     enabled: true,
@@ -199,13 +200,24 @@
     return ctx?.getRequestHeaders?.() || {};
   }
   async function uploadText(name, text) {
+    // 压缩(JSON 文本 gzip 后通常只剩 10~20%),标记前缀区分
+    let payload = text;
+    try {
+      const gz = await gzipText(text);
+      payload = GZ_MAGIC + gz;
+      log(
+        `压缩 ${name}: ${Math.round(text.length / 1024)}KB -> ${Math.round(gz.length / 1024)}KB`,
+      );
+    } catch (e) {
+      warn(`压缩失败,原始上传 ${name}:`, e);
+      // 压缩失败回退为分段的原始 base64
+      payload = text;
+    }
+    // 分段 base64(payload 可能含中文,btoa 不认,需分段转)
     const r = await fetch(API_UPLOAD, {
       method: "POST",
       headers: { "Content-Type": "application/json", ...reqHeaders() },
-      body: JSON.stringify({
-        name,
-        data: btoa(unescape(encodeURIComponent(text))),
-      }),
+      body: JSON.stringify({ name, data: base64FromText(payload) }),
     });
     if (!r.ok)
       throw new Error(
@@ -217,6 +229,76 @@
           (await r.text()).slice(0, 200),
       );
   }
+
+  function base64FromText(text) {
+    // TextEncoder → Uint8Array → 分块 btoa(每块 32KB,防 call stack 爆)
+    const bytes = new TextEncoder().encode(text);
+    let binary = "";
+    const STEP = 32768;
+    for (let i = 0; i < bytes.length; i += STEP) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + STEP));
+    }
+    return btoa(binary);
+  }
+
+  async function gzipText(text) {
+    // CompressionStream 流式压缩 → base64 文本
+    const cs = new CompressionStream("gzip");
+    const writer = cs.writable.getWriter();
+    const reader = cs.readable.getReader();
+    const encode = new TextEncoder().encode(text);
+    writer.write(encode);
+    writer.close();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+    const gz = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      gz.set(c, off);
+      off += c.length;
+    }
+    // Uint8Array → base64
+    let binary = "";
+    const STEP = 32768;
+    for (let i = 0; i < gz.length; i += STEP) {
+      binary += String.fromCharCode(...gz.subarray(i, i + STEP));
+    }
+    return btoa(binary);
+  }
+
+  async function gunzipText(b64) {
+    // base64 → Uint8Array → DecompressionStream 流式解压 → 文本
+    const binary = atob(b64);
+    const gz = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) gz[i] = binary.charCodeAt(i);
+    const ds = new DecompressionStream("gzip");
+    const writer = ds.writable.getWriter();
+    const reader = ds.readable.getReader();
+    writer.write(gz);
+    writer.close();
+    const chunks = [];
+    let total = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      total += value.length;
+    }
+    const out = new Uint8Array(total);
+    let off = 0;
+    for (const c of chunks) {
+      out.set(c, off);
+      off += c.length;
+    }
+    return new TextDecoder().decode(out);
+  }
+
   async function deleteText(fileName) {
     const r = await fetch(API_DELETE, {
       method: "POST",
@@ -231,8 +313,18 @@
       cache: "no-store",
     });
     if (!r.ok) throw new Error("fetch " + fileName + " -> " + r.status);
-    return await r.text();
+    let text = await r.text();
+    // 压缩文件: 前缀标记 + base64(gzip) → 解压
+    if (text.startsWith(GZ_MAGIC)) {
+      const b64 = text.slice(GZ_MAGIC.length);
+      text = await gunzipText(b64);
+      log(
+        `解压 ${fileName}: ${Math.round(b64.length / 1024)}KB -> ${Math.round(text.length / 1024)}KB`,
+      );
+    }
+    return text;
   }
+
   function dbFileName(dbName, chunk) {
     const safe = dbName.replace(/[^A-Za-z0-9_.-]/g, "_");
     return chunk !== undefined
@@ -752,17 +844,38 @@
         }
       }
       if (act === "import") {
-        const v = await importMirror(true);
-        refresh();
-        if (
-          v &&
-          confirm(
-            "[WebView同步] 已从镜像恢复 v" +
-              v +
-              ".\n立即刷新界面让各扩展重新加载配置?\n(取消=稍后自行刷新,期间各扩展可能仍用旧数据)",
+        busy = true;
+        const btn = div.querySelector('[data-act="import"]');
+        const oldHtml = btn ? btn.innerHTML : null;
+        if (btn)
+          btn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i><span>恢复中...</span>';
+        try {
+          const v = await importMirror(true);
+          await refresh();
+          if (
+            v &&
+            confirm(
+              "[WebView同步] 已从镜像恢复 v" +
+                v +
+                ".\n立即刷新界面让各扩展重新加载配置?\n(取消=稍后自行刷新,期间各扩展可能仍用旧数据)",
+            )
           )
-        )
-          location.reload();
+            location.reload();
+          else if (v) alert("已恢复到 v" + v + ",稍后自行刷新界面即可生效");
+          else alert("无需导入(远端无新镜像)");
+        } catch (err) {
+          console.error("[webview-sync] 恢复失败", err);
+          record("ERROR", ["恢复失败:", err]);
+          alert(
+            "恢复失败: " +
+              (err?.message || err) +
+              "\n请点「导出日志」并把文件发给开发者",
+          );
+        } finally {
+          if (btn && oldHtml) btn.innerHTML = oldHtml;
+          busy = false;
+        }
       }
       if (act === "scan") {
         await renderLists();

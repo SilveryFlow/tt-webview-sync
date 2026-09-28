@@ -844,17 +844,38 @@
         }
       }
       if (act === "import") {
-        const v = await importMirror(true);
-        refresh();
-        if (
-          v &&
-          confirm(
-            "[WebView同步] 已从镜像恢复 v" +
-              v +
-              ".\n立即刷新界面让各扩展重新加载配置?\n(取消=稍后自行刷新,期间各扩展可能仍用旧数据)",
+        busy = true;
+        const btn = div.querySelector('[data-act="import"]');
+        const oldHtml = btn ? btn.innerHTML : null;
+        if (btn)
+          btn.innerHTML =
+            '<i class="fa-solid fa-spinner fa-spin"></i><span>恢复中...</span>';
+        try {
+          const v = await importMirror(true);
+          await refresh();
+          if (
+            v &&
+            confirm(
+              "[WebView同步] 已从镜像恢复 v" +
+                v +
+                ".\n立即刷新界面让各扩展重新加载配置?\n(取消=稍后自行刷新,期间各扩展可能仍用旧数据)",
+            )
           )
-        )
-          location.reload();
+            location.reload();
+          else if (v) alert("已恢复到 v" + v + ",稍后自行刷新界面即可生效");
+          else alert("无需导入(远端无新镜像)");
+        } catch (err) {
+          console.error("[webview-sync] 恢复失败", err);
+          record("ERROR", ["恢复失败:", err]);
+          alert(
+            "恢复失败: " +
+              (err?.message || err) +
+              "\n请点「导出日志」并把文件发给开发者",
+          );
+        } finally {
+          if (btn && oldHtml) btn.innerHTML = oldHtml;
+          busy = false;
+        }
       }
       if (act === "scan") {
         await renderLists();

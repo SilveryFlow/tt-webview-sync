@@ -984,13 +984,14 @@
         importMirror(false)
           .catch((e) => error("启动自动恢复失败:", e))
           .then((v) => {
-            if (v)
+            if (v) {
               toast(
                 "success",
                 "WebView同步",
                 "检测到来自其他设备的新镜像(v" + v + ")，3 秒后自动刷新界面",
               );
-            setTimeout(() => location.reload(), 3000);
+              setTimeout(() => location.reload(), 3000);
+            }
           }),
       4000,
     );

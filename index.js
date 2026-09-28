@@ -1,12 +1,17 @@
 /**
- * WebView 存储同步器 v0.4.0 — 动态收集版
- * 动态发现同 origin 的全部 IndexedDB 库与 localStorage 键（新扩展/新脚本建的库自动出现在面板），
- * 序列化进 extension_settings（settings.json → settings.core 数据集），借 TT lan_sync 同步到对端并在启动时恢复。
- * 黑名单模式：默认全部收集，勾掉的排除；已知纯缓存库默认排除。
+ * WebView 存储同步器 v0.6.0 — 独立同步项版
+ * 动态发现全部 IndexedDB 库与 localStorage 键，按库分文件写到 user/files/ 下的平铺文件
+ * （wvs__ 前缀；user/files = TT「user.files」数据集，同步范围里独立可勾选，不碰 settings.json），
+ * 借 TT lan_sync 同步到对端并在启动时恢复。黑名单模式：默认全收，勾掉的排除。
+ * 上传走 POST /api/files/upload（TT 源码 validate_upload_name 规则：文件名禁含路径分隔符，故用前缀命名）。
  */
 (() => {
   'use strict';
   const NS = 'webviewSync';
+  const PREFIX = 'wvs__';                       // user/files 下的镜像文件前缀（API 禁止子目录，用前缀代替）
+  const MANIFEST_NAME = PREFIX + 'manifest.json';
+  const API_UPLOAD = '/api/files/upload';
+  const FILE_BASE = '/user/files/';
 
   const DEFAULTS = {
     enabled: true,
@@ -21,7 +26,6 @@
     autoExportOnSave: false,
     lastImportedVersion: 0,
     lastExportVersion: 0,
-    mirror: null,
   };
 
   const log = (...a) => console.log('[webview-sync]', ...a);
@@ -92,6 +96,28 @@
     if (s.lsExclude.some(p => k.startsWith(p))) return false;
     if (k in s.lsPick) return !!s.lsPick[k];
     return true;
+  }
+
+  // ---------- 文件层（user/files → user.files 数据集） ----------
+  function reqHeaders() {
+    const ctx = window.SillyTavern?.getContext?.();
+    return (ctx?.getRequestHeaders?.() || {});
+  }
+  async function uploadText(name, text) {
+    const r = await fetch(API_UPLOAD, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...reqHeaders() },
+      body: JSON.stringify({ name, data: btoa(unescape(encodeURIComponent(text))) }),
+    });
+    if (!r.ok) throw new Error('upload ' + name + ' -> ' + r.status + ': ' + (await r.text()).slice(0, 200));
+  }
+  async function fetchText(fileName) {
+    const r = await fetch(FILE_BASE + encodeURIComponent(fileName), { cache: 'no-store' });
+    if (!r.ok) throw new Error('fetch ' + fileName + ' -> ' + r.status);
+    return await r.text();
+  }
+  function dbFileName(dbName) {
+    return PREFIX + 'db__' + dbName.replace(/[^A-Za-z0-9_.-]/g, '_') + '.json';
   }
 
   // ---------- 序列化 ----------
@@ -229,26 +255,48 @@
 
   // ---------- 导出 / 导入 ----------
   async function exportMirror() {
-    const s = getSettings(); if (!s) return warn('设置不可用');
+    const s = getSettings(); if (!s) throw new Error('设置不可用');
     skipped.length = 0;
-    const dbs = {};
     const found = await discoverDbs();
     const picked = found.filter(n => pickDb(s, n));
-    for (const name of picked) dbs[name] = await exportDb(name);
     const ls = {};
     for (const k of discoverLsKeys()) if (pickLs(s, k)) ls[k] = localStorage.getItem(k);
-    s.mirror = { version: Date.now(), device: s.deviceId, dbs, ls, skipped: [...skipped] };
-    s.lastExportVersion = s.mirror.version;
+
+    // 先写数据文件，最后写清单（清单=提交点；对端只见新清单即视为新镜像）
+    const exports = {};
+    for (const name of picked) {
+      const dump = await exportDb(name);
+      await uploadText(dbFileName(name), JSON.stringify(dump));
+      exports[name] = dbFileName(name);
+    }
+    const version = Date.now();
+    await uploadText(MANIFEST_NAME, JSON.stringify({
+      version, device: s.deviceId, exports, ls, skipped: [...skipped], blobLimitKb: s.blobLimitKb,
+    }));
+
+    s.lastExportVersion = version;
+    s.lastImportedVersion = version; // 本机导出即本机最新
     saveSettingsDebounced();
-    log('镜像已导出 v', s.mirror.version, '| 库:', picked.length, '| ls键:', Object.keys(ls).length, '| 跳过:', skipped.length);
-    return s.mirror.version;
+    log('镜像已导出 v', version, '| 库:', picked.length, '| ls键:', Object.keys(ls).length, '| 跳过:', skipped.length);
+    return version;
+  }
+
+  async function fetchManifest() {
+    try { return JSON.parse(await fetchText(MANIFEST_NAME)); }
+    catch (_) { return null; }
   }
 
   async function importMirror(force = false) {
-    const s = getSettings(); if (!s || !s.mirror) return log('无镜像');
-    const m = s.mirror;
+    const s = getSettings(); if (!s) return log('设置不可用');
+    const m = await fetchManifest();
+    if (!m) return log('远端无镜像清单');
     if (!force && (m.version <= s.lastImportedVersion || m.version <= s.lastExportVersion)) return log('无需导入');
-    for (const name of Object.keys(m.dbs || {})) await importDb(name, m.dbs[name]);
+    for (const [name, file] of Object.entries(m.exports || {})) {
+      try {
+        const dump = JSON.parse(await fetchText(file));
+        await importDb(name, dump);
+      } catch (e) { warn('恢复库失败', name, e); }
+    }
     for (const [k, v] of Object.entries(m.ls || {})) localStorage.setItem(k, v);
     s.lastImportedVersion = m.version;
     saveSettingsDebounced();
@@ -367,11 +415,11 @@
       }
     }
 
-    const refresh = () => {
-      const m = s.mirror;
+    const refresh = async () => {
+      const m = await fetchManifest();
       $st.textContent = m
-        ? `镜像 v${m.version} @${m.device} · 库 ${Object.keys(m.dbs || {}).length} · ls ${Object.keys(m.ls || {}).length} · 跳过 ${(m.skipped || []).length} · 已导入 ${s.lastImportedVersion || '无'}`
-        : '尚无镜像——点「导出镜像到同步」生成第一份（之后随 TT 同步自动到其他设备）';
+        ? `镜像 v${m.version} @${m.device} · 库 ${Object.keys(m.exports || {}).length} · ls ${Object.keys(m.ls || {}).length} · 跳过 ${(m.skipped || []).length} · 本机已导入 ${s.lastImportedVersion || '无'}`
+        : '尚无镜像（user/files 下的 wvs__ 文件）——点「导出镜像到同步」生成第一份';
     };
     refresh();
     $('.ws-limit').value = s.blobLimitKb;

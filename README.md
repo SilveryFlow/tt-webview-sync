@@ -9,8 +9,8 @@ TauriTavern 的同步按"数据集"（白名单目录/文件）传输，覆盖 s
 本扩展做一个双向桥：
 
 ```
-导出：IndexedDB/localStorage ─序列化→ extension_settings.webviewSync.mirror ─→ settings.json ─→ settings.core 数据集 ─→ TT 同步
-导入：TT 同步落地 settings.json ─→ 启动时检测镜像版本新于本地 ─→ 反序列化写回 IndexedDB/localStorage ─→ 提示重启生效
+导出：IndexedDB/localStorage ─按库分文件→ user/files/wvs__*.json（POST /api/files/upload）─→ user.files 数据集 ─→ TT 同步
+导入：TT 同步落地 user/files ─→ 启动时读 wvs__manifest.json 比对版本 ─→ 逐库恢复写回 IndexedDB/localStorage ─→ 提示重启生效
 ```
 
 ## 安装
@@ -87,8 +87,9 @@ https://github.com/SilveryFlow/tt-webview-sync
 
 ## 原理与数据集依据
 
-- TT 同步数据集为白名单制（`ttsync-core` 的 `DATASETS` 常量），`settings.core` 覆盖 `default-user/settings.json`；
-- 镜像整体存在 `extension_settings.webviewSync.mirror`，随 settings.json 传输、断点、压缩、落地全部由 TT 同步系统负责；
+- TT 同步数据集为白名单制（`ttsync-core` 的 `DATASETS` 常量），**`user.files` 覆盖 `default-user/user/files/` 目录**——镜像是其中 `wvs__` 前缀的平铺文件（上传 API 按源码规则禁含路径分隔符）；
+- 镜像**不再进 settings.json**：在 TT 同步范围里它随「user.files」数据集独立启停、独立勾选；按库分文件，同步时只传有变更的库文件；
+- 传输、断点、压缩、落地全部由 TT 同步系统负责。
 - 对端恢复用 `indexedDB.open` 按镜像的 keyPath 重建空库结构后逐 store 写入，Blob 从 base64 还原。
 
 ## License

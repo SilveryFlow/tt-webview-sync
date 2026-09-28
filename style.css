@@ -13,3 +13,8 @@
 .ws-btn { cursor: pointer; }
 .ws-status { font-size: .85em; opacity: .8; word-break: break-all; }
 .ws-dbs { width: 100%; font-family: monospace; font-size: .85em; }
+.ws-sec { font-weight: 700; font-size: .85em; margin-top: 4px; }
+.ws-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--SmartThemeBorderColor,#555); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+.ws-item { display: flex; gap: 6px; align-items: baseline; font-size: .8em; cursor: pointer; word-break: break-all; }
+.ws-name { }
+.ws-info { opacity: .55; font-size: .9em; }

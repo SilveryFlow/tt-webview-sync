@@ -37,7 +37,7 @@
   const logBuf = [];
   function record(level, args) {
     logBuf.push(
-      `[${new Date().toISOString()}] [${level}] ` +
+      `[${new Date().toLocaleString("sv-SE", { timeZone: "Asia/Shanghai", hour12: false })}] [${level}] ` +
         args
           .map((a) => {
             if (a instanceof Error) return a.stack || String(a);

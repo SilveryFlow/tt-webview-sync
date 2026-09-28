@@ -56,11 +56,21 @@
   ];
   let lastDiscoverMode = '未扫描';
 
+  function openWithTimeout(name, ms = 3000, useVersion) {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const done = (fn, arg) => { if (!settled) { settled = true; clearTimeout(t); fn(arg); } };
+      const q = useVersion === undefined ? indexedDB.open(name) : indexedDB.open(name, useVersion);
+      const t = setTimeout(() => done(reject, new Error('open 超时')), ms);
+      q.onsuccess = () => done(resolve, q.result);
+      q.onerror = () => done(reject, q.error);
+      q.onblocked = () => done(reject, new Error('open 被占用'));
+    });
+  }
+
   async function probeDb(name) {
-    try {
-      await new Promise((res, rej) => { const q = indexedDB.open(name); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
-      return true;
-    } catch (_) { return false; }
+    try { const db = await openWithTimeout(name); db.close(); return true; }
+    catch (_) { return false; }
   }
 
   async function discoverDbs() {
@@ -154,12 +164,7 @@
   async function exportDb(dbName) {
     let db;
     try {
-      db = await new Promise((res, rej) => {
-        const req = indexedDB.open(dbName);
-        req.onsuccess = () => res(req.result);
-        req.onerror = () => rej(req.error);
-        req.onblocked = () => rej(new Error('blocked'));
-      });
+      db = await openWithTimeout(dbName, 5000);
     } catch (e) {
       return { __missing: String(e?.message || e) };
     }
@@ -194,16 +199,13 @@
 
   async function importDb(dbName, dump) {
     if (!dump || dump.__missing) return;
-    const probe = await new Promise((res, rej) => {
-      const req = indexedDB.open(dbName);
-      req.onsuccess = () => res(req.result);
-      req.onerror = () => rej(req.error);
-    });
+    const probe = await openWithTimeout(dbName);
     const version = probe.version; probe.close();
     const db = await new Promise((res, rej) => {
       const req = indexedDB.open(dbName, version);
       req.onsuccess = () => res(req.result);
       req.onerror = () => rej(req.error);
+      req.onblocked = () => rej(new Error('open 被占用'));
       req.onupgradeneeded = (e) => {
         const d = e.target.result;
         for (const sn of Object.keys(dump)) {
@@ -384,25 +386,32 @@
     });
 
     async function renderLists() {
-      const names = await discoverDbs();
-      $dbl.innerHTML = '';
-      for (const n of names) {
-        const row = document.createElement('label');
-        row.className = 'ws-item';
-        const checked = pickDb(s, n);
-        const excluded = s.dbExclude.includes(n);
-        let info = '';
-        try {
-          const db = await new Promise((res, rej) => { const q = indexedDB.open(n); q.onsuccess = () => res(q.result); q.onerror = () => rej(q.error); });
-          info = [...db.objectStoreNames].join(','); db.close();
-          info = info ? `(${info.slice(0, 60)})` : '(空)';
-        } catch (_) { info = '(无法打开)'; }
-        row.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} ${excluded ? 'title="默认排除(缓存类)，勾选可强制同步"' : ''}> <span class="ws-name">${n}</span> <span class="ws-info">${info}</span>`;
-        row.querySelector('input').addEventListener('change', (e) => { s.dbPick[n] = e.target.checked; saveSettingsDebounced(); });
-        $dbl.appendChild(row);
-      }
       const $dbMeta = div.querySelector('.ws-dbmeta');
-      if ($dbMeta) $dbMeta.textContent = `（发现 ${names.length} 库 · ${lastDiscoverMode} · 勾选=同步）`;
+      try {
+        if ($dbMeta) $dbMeta.textContent = '（扫描中…）';
+        const names = await discoverDbs();
+        $dbl.innerHTML = '';
+        for (const n of names) {
+          const row = document.createElement('label');
+          row.className = 'ws-item';
+          const checked = pickDb(s, n);
+          const excluded = s.dbExclude.includes(n);
+          let info = '';
+          try {
+            const db = await openWithTimeout(n);
+            info = [...db.objectStoreNames].join(','); db.close();
+            info = info ? `(${info.slice(0, 60)})` : '(空)';
+          } catch (e) { info = `(无法打开: ${String(e?.message || e).slice(0, 30)})`; }
+          row.innerHTML = `<input type="checkbox" ${checked ? 'checked' : ''} ${excluded ? 'title="默认排除(缓存类)，勾选可强制同步"' : ''}> <span class="ws-name">${n}</span> <span class="ws-info">${info}</span>`;
+          row.querySelector('input').addEventListener('change', (e) => { s.dbPick[n] = e.target.checked; saveSettingsDebounced(); });
+          $dbl.appendChild(row);
+        }
+        if ($dbMeta) $dbMeta.textContent = `（发现 ${names.length} 库 · ${lastDiscoverMode} · 勾选=同步）`;
+      } catch (e) {
+        if ($dbMeta) $dbMeta.textContent = `（扫描失败: ${String(e?.message || e).slice(0, 80)}）`;
+        console.error('[webview-sync] 扫描失败', e);
+        return;
+      }
       $lsl.innerHTML = '';
       const keys = discoverLsKeys().sort();
       for (const k of keys) {

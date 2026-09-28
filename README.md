@@ -29,15 +29,22 @@ https://github.com/SilveryFlow/tt-webview-sync
 
 面板还有「从镜像恢复(强制)」按钮（手动覆盖本地）、镜像库清单编辑、自动导出开关。
 
-## 默认镜像范围
+## 默认镜像范围（源码实证 10 库）
 
-| IndexedDB 库 | 内容 |
-| --- | --- |
-| `yuzi-phone-qq-v2` | 玉子手机 QQ：联系人/群聊/会话/API 预设/头像 |
-| `shujuku_v120_config_v1` | SP·数据库 配置缓存（排除标签等） |
-| `douluo-main-text-assets` | 斗罗状态栏头像/立绘库 |
+| IndexedDB 库 | 归属 | 内容 |
+| --- | --- | --- |
+| `yuzi-phone-qq-v2` | 玉子手机 | QQ：联系人/群聊/会话/预设/头像 |
+| `yuzi-phone-appearance-assets` | 玉子手机 | 外观资源 |
+| `yuzi-phone-appearance-packs` | 玉子手机 | 外观包 |
+| `yuzi-phone-template-workshop-v2` | 玉子手机 | 模板工作台/美化工程 |
+| `yuzi-phone-table-image-ownership` | 玉子手机 | 表格图片归属 |
+| `shujuku_v120_config_v1` | SP·数据库 | 配置缓存（排除标签等） |
+| `douluo-main-text-assets` | 斗罗卡脚本 | 状态栏/正文/角色创建 头像立绘 |
+| `wn_phone_media_v1` | 偏航卡脚本 | 手机外壳媒体库（LIME 头像等） |
+| `chatu8_config_images` | 柏宝绘 | 配置图片 |
+| `baibai_image_vibes` | 柏宝绘 | vibe 数据 |
 
-可在面板里增删库名。
+排除：`yuzi-phone-cache`（纯缓存）。清单可在面板自由增删。
 
 ## 已知边界
 

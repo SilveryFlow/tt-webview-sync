@@ -14,10 +14,17 @@
   const DEFAULTS = {
     enabled: true,
     deviceId: '',            // 首次运行生成
-    dbs: [                   // 要镜像的 IndexedDB 库名单
-      'yuzi-phone-qq-v2',
-      'shujuku_v120_config_v1',
-      'douluo-main-text-assets',
+    dbs: [                   // 要镜像的 IndexedDB 库名单（源码实证清单，可在面板增删）
+      'yuzi-phone-qq-v2',                 // 玉子手机 QQ：联系人/群聊/会话/预设/头像
+      'yuzi-phone-appearance-assets',     // 玉子手机 外观资源
+      'yuzi-phone-appearance-packs',      // 玉子手机 外观包
+      'yuzi-phone-template-workshop-v2',  // 玉子手机 模板工作台/美化工程
+      'yuzi-phone-table-image-ownership', // 玉子手机 表格图片归属
+      'shujuku_v120_config_v1',           // SP·数据库 配置缓存
+      'douluo-main-text-assets',          // 斗罗状态栏/正文/角色创建 头像立绘
+      'wn_phone_media_v1',                // 偏航手机外壳 媒体库(LIME头像等)
+      'chatu8_config_images',             // 柏宝绘 chatu8 配置图片
+      'baibai_image_vibes',               // 柏宝绘 vibe 数据
     ],
     lsPrefixes: [],          // localStorage 键前缀过滤；空数组=不同步 localStorage
     autoExportOnSave: false, // 每次 TT 保存设置时顺带导出（MVP 默认关，手动按钮为主）

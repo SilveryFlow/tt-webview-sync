@@ -3,13 +3,14 @@
  * 把扩展的 IndexedDB/localStorage 数据镜像进 TT 同步数据集：
  *   - 全局镜像 → extension_settings.webviewSync.mirror（settings.json → settings.core 数据集）
  *   - 借 TT lan_sync 传输，对端启动时检测新版并写回本地存储
- * 镜像中跳过超大 blob（>BLOB_LIMIT），记录在 skipped 里待二期走媒体数据集。
+ * 大文件默认全部进镜像（blobLimitKb=0 不限制）；设置上限后超出者记入 skipped。
  */
 (() => {
   'use strict';
   const NS = 'webviewSync';
   const MIRROR_KEY = 'mirror';
-  const BLOB_LIMIT = 100 * 1024; // 超过此体积的 Blob 跳过（base64 前的原始字节数）
+  // 单 Blob 上限(KB)。0=不限制全部进镜像；>0 时超出者跳过并记入 skipped。
+  const DEFAULT_BLOB_LIMIT_KB = 0;
 
   const DEFAULTS = {
     enabled: true,
@@ -27,6 +28,7 @@
       'baibai_image_vibes',               // 柏宝绘 vibe 数据
     ],
     lsPrefixes: [],          // localStorage 键前缀过滤；空数组=不同步 localStorage
+    blobLimitKb: DEFAULT_BLOB_LIMIT_KB, // 单 Blob 上限(KB)，0=不限制
     autoExportOnSave: false, // 每次 TT 保存设置时顺带导出（MVP 默认关，手动按钮为主）
     lastImportedVersion: 0,
     lastExportVersion: 0,
@@ -112,11 +114,13 @@
 
   async function serializeValue(v) {
     if (v instanceof Blob) {
-      if (v.size > BLOB_LIMIT) { skipped.push(`blob ${v.size}B`); return { __blobSkipped: true, size: v.size, type: v.type }; }
+      const limit = Math.max(0, Number(getSettings()?.blobLimitKb) || 0) * 1024;
+      if (limit > 0 && v.size > limit) { skipped.push(`blob ${v.size}B`); return { __blobSkipped: true, size: v.size, type: v.type }; }
       return { __blob: true, mime: v.type, data: await blobToBase64(v) };
     }
     if (v instanceof ArrayBuffer) {
-      if (v.byteLength > BLOB_LIMIT) { skipped.push(`ab ${v.byteLength}B`); return { __blobSkipped: true, size: v.byteLength }; }
+      const limit = Math.max(0, Number(getSettings()?.blobLimitKb) || 0) * 1024;
+      if (limit > 0 && v.byteLength > limit) { skipped.push(`ab ${v.byteLength}B`); return { __blobSkipped: true, size: v.byteLength }; }
       return { __ab: true, b64: btoa(String.fromCharCode(...new Uint8Array(v))) };
     }
     if (v && typeof v === 'object' && !(v instanceof Date)) {
@@ -239,6 +243,7 @@
       </div>
       <div class="ws-status"></div>
       <textarea class="ws-dbs" rows="3" title="每行一个 IndexedDB 库名"></textarea>
+      <div class="ws-row"><label>单文件上限(KB,0=不限) <input type="number" class="ws-limit" style="width:80px" min="0"></label></div>
       <div class="ws-row"><label><input type="checkbox" class="ws-auto"> 随设置保存自动导出</label></div>
     `;
     const $st = div.querySelector('.ws-status');

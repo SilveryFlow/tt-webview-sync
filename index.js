@@ -123,6 +123,14 @@
     });
     if (!r.ok) throw new Error('upload ' + name + ' -> ' + r.status + ': ' + (await r.text()).slice(0, 200));
   }
+  async function deleteText(fileName) {
+    const r = await fetch(API_DELETE, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...reqHeaders() },
+      body: JSON.stringify({ path: '/user/files/' + fileName }),
+    });
+    if (!r.ok && r.status !== 404) throw new Error('delete ' + fileName + ' -> ' + r.status);
+  }
   async function fetchText(fileName) {
     const r = await fetch(FILE_BASE + encodeURIComponent(fileName), { cache: 'no-store' });
     if (!r.ok) throw new Error('fetch ' + fileName + ' -> ' + r.status);
@@ -334,6 +342,9 @@
                 <button type="button" class="menu_button" data-act="scan">
                   <i class="fa-solid fa-rotate"></i><span>重新扫描</span>
                 </button>
+                <button type="button" class="menu_button" data-act="wipe">
+                  <i class="fa-solid fa-trash-can"></i><span>删除云端镜像</span>
+                </button>
               </div>
 
               <div class="ws-status text_pole" style="margin:0; white-space:normal; word-break:break-all; display:block; text-align:left;">尚无镜像</div>
@@ -444,6 +455,19 @@
       if (act === 'export') { const v = await exportMirror(); refresh(); alert('镜像已导出 v' + v + (skipped.length ? '\n跳过 ' + skipped.length + ' 个大文件' : '')); }
       if (act === 'import') { const v = await importMirror(true); refresh(); alert('已从镜像恢复 v' + v + '\n建议重启 TT 让各扩展重载'); }
       if (act === 'scan') { await renderLists(); alert('已重新扫描'); }
+      if (act === 'wipe') {
+        if (!confirm('删除已导出的全部镜像文件（user/files 下的 wvs__*.json）？\n下次 TT 同步会把删除同步到其他设备（它们的镜像也会消失，本地 IndexedDB 数据不受影响）。')) return;
+        try {
+          const m = await fetchManifest();
+          const files = Object.values(m?.exports || {});
+          if (m) files.push(MANIFEST_NAME);
+          for (const f of files) await deleteText(f);
+          s.lastImportedVersion = 0; s.lastExportVersion = 0;
+          saveSettingsDebounced();
+          refresh();
+          alert('已删除 ' + files.length + ' 个镜像文件');
+        } catch (e) { alert('删除失败: ' + (e?.message || e)); }
+      }
     });
 
     renderLists();

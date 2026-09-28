@@ -429,7 +429,7 @@
     const refresh = async () => {
       const m = await fetchManifest();
       $st.textContent = m
-        ? `镜像 v${m.version} @${m.device} · 库 ${Object.keys(m.exports || {}).length} · ls ${Object.keys(m.ls || {}).length} · 跳过 ${(m.skipped || []).length} · 本机已导入 ${s.lastImportedVersion || '无'}`
+        ? `镜像 v${m.version} @${m.device} · 库 ${Object.keys(m.exports || {}).length} · ls ${Object.keys(m.ls || {}).length} · 跳过 ${(m.skipped || []).length} · 本机已同步 ${s.lastImportedVersion || '无'}`
         : '尚无镜像（user/files 下的 wvs__ 文件）——点「导出镜像到同步」生成第一份';
     };
     refresh();

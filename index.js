@@ -32,6 +32,17 @@
     lastExportVersion: 0,
   };
 
+  // ---------- 通知(ST/TT 生态标准 toastr, 原生 alert/confirm 在 TT WebView 会被吞) ----------
+  function toast(type, title, msg, opts = {}) {
+    const t = window.SillyTavern?.getContext?.()?.toastr || window.toastr;
+    if (t?.[type]) {
+      t[type](msg, title, { timeOut: opts.timeOut || 5000, ...opts });
+    } else {
+      // toastr 不可用时的兜底(写入日志)
+      record("INFO", [`[toast:${type}]`, title, msg]);
+    }
+  }
+
   // ---------- 日志环形缓冲(用户可导出) ----------
   const LOG_MAX = 500;
   const logBuf = [];
@@ -815,7 +826,7 @@
         return;
       }
       if (busy) {
-        alert("[WebView同步] 上一个操作还在进行中，请等它完成");
+        toast("warning", "WebView同步", "上一个操作还在进行中");
         return;
       }
       if (act === "export") {
@@ -828,18 +839,23 @@
         try {
           const v = await exportMirror();
           await refresh();
-          alert(
-            "镜像已导出 v" +
+          toast(
+            "success",
+            "镜像已导出",
+            "v" +
               v +
-              (skipped.length ? "\n跳过 " + skipped.length + " 个大文件" : ""),
+              (skipped.length ? "，跳过 " + skipped.length + " 个大文件" : ""),
           );
         } catch (err) {
           console.error("[webview-sync] 导出失败", err);
           record("ERROR", ["导出失败:", err]);
-          alert(
-            "导出失败: " +
-              (err?.message || err) +
-              "\n请点「导出日志」并把文件发给开发者",
+          toast(
+            "error",
+            "导出失败",
+            String(err?.message || err) + "，请导出日志",
+            {
+              timeOut: 10000,
+            },
           );
         } finally {
           if (btn && old) btn.innerHTML = old;
@@ -857,19 +873,25 @@
           const v = await importMirror(true);
           await refresh();
           if (v)
-            alert(
-              "[WebView同步] 已从镜像恢复 v" +
+            toast(
+              "success",
+              "WebView同步",
+              "已从镜像恢复 v" +
                 v +
                 "，本地存储已更新。\n请点击「刷新界面」按钮让各扩展重新加载配置。",
             );
-          else alert("无需导入（远端没有比本地新的镜像）");
+          else
+            toast("info", "WebView同步", "无需导入（远端没有比本地新的镜像）");
         } catch (err) {
           console.error("[webview-sync] 恢复失败", err);
           record("ERROR", ["恢复失败:", err]);
-          alert(
-            "恢复失败: " +
-              (err?.message || err) +
-              "\n请点「导出日志」并把文件发给开发者",
+          toast(
+            "error",
+            "恢复失败",
+            String(err?.message || err) + "，请导出日志",
+            {
+              timeOut: 10000,
+            },
           );
         } finally {
           if (btn && oldHtml) btn.innerHTML = oldHtml;
@@ -881,15 +903,33 @@
       }
       if (act === "scan") {
         await renderLists();
-        alert("已重新扫描");
+        toast("success", "已重新扫描", "");
       }
       if (act === "wipe") {
-        if (
-          !confirm(
-            "删除已导出的全部镜像文件（user/files 下的 wvs__*.json）？\n下次 TT 同步会把删除同步到其他设备（它们的镜像也会消失，本地 IndexedDB 数据不受影响）。",
-          )
-        )
+        // 两步确认(TT WebView 会吞 confirm,用按钮状态代替)
+        const wipeBtn = div.querySelector('[data-act="wipe"]');
+        if (!window.__wvsWipeArmed) {
+          window.__wvsWipeArmed = true;
+          if (wipeBtn) {
+            wipeBtn.dataset.origHtml = wipeBtn.innerHTML;
+            wipeBtn.innerHTML =
+              '<i class="fa-solid fa-triangle-exclamation"></i><span>再点一次确认删除</span>';
+          }
+          toast(
+            "warning",
+            "删除确认",
+            "再点一次「删除镜像」确认删除全部镜像文件",
+          );
+          setTimeout(() => {
+            window.__wvsWipeArmed = false;
+            if (wipeBtn?.dataset.origHtml)
+              wipeBtn.innerHTML = wipeBtn.dataset.origHtml;
+          }, 5000);
           return;
+        }
+        window.__wvsWipeArmed = false;
+        if (wipeBtn?.dataset.origHtml)
+          wipeBtn.innerHTML = wipeBtn.dataset.origHtml;
         try {
           const m = await fetchManifest();
           const files = [];
@@ -913,10 +953,10 @@
           s.lastExportVersion = 0;
           saveSettingsDebounced();
           refresh();
-          alert("已删除 " + files.length + " 个镜像文件");
+          toast("success", "已删除", files.length + " 个镜像文件");
         } catch (e) {
           error("删除镜像失败:", e);
-          alert("删除失败: " + (e?.message || e));
+          toast("error", "删除失败", e?.message || e);
         }
       }
     });
@@ -940,8 +980,10 @@
           .catch((e) => error("启动自动恢复失败:", e))
           .then((v) => {
             if (v)
-              alert(
-                "[WebView同步] 检测到来自其他设备的新镜像(v" +
+              toast(
+                "success",
+                "WebView同步",
+                "检测到来自其他设备的新镜像(v" +
                   v +
                   ")，已写入本地存储。\n请到扩展设置点「刷新界面」让各扩展重新加载配置。",
               );

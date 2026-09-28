@@ -27,7 +27,6 @@
     lsExclude: [],
     blobLimitKb: 0, // 单 Blob 上限(KB)，0=不限制
     dbLimitMb: 50, // 单库序列化后上限(MB)，超过跳过防 JS 字符串爆长(V8 约 512MB)
-    autoExportOnSave: false,
     lastImportedVersion: 0,
     lastExportVersion: 0,
   };
@@ -762,9 +761,6 @@
 
               <div class="ws-options">
                 <label class="checkbox_label">
-                  <input type="checkbox" class="ws-auto"><span>随设置保存自动导出</span>
-                </label>
-                <label class="checkbox_label">
                   <span>单文件上限(KB)</span>
                   <input type="number" class="ws-limit text_pole" style="width:70px;" min="0">
                 </label>
@@ -870,10 +866,6 @@
     $(".ws-limit").value = s.blobLimitKb;
     $(".ws-limit").addEventListener("change", (e) => {
       s.blobLimitKb = Math.max(0, Number(e.target.value) || 0);
-    });
-    $(".ws-auto").checked = !!s.autoExportOnSave;
-    $(".ws-auto").addEventListener("change", (e) => {
-      s.autoExportOnSave = e.target.checked;
     });
 
     let busy = false;

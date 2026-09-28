@@ -41,6 +41,7 @@
   }
   const log = (...a) => { record('INFO', a); console.log('[webview-sync]', ...a); };
   const warn = (...a) => { record('WARN', a); console.warn('[webview-sync]', ...a); };
+  const error = (...a) => { record('ERROR', a); console.error('[webview-sync]', ...a); };
   function exportLog() {
     const text = logBuf.join('\n') || '(无日志)';
     const blob = new Blob([text], { type: 'text/plain' });
@@ -93,7 +94,7 @@
 
   async function probeDb(name) {
     try { const db = await openWithTimeout(name); db.close(); return true; }
-    catch (_) { return false; }
+    catch (e) { error('探活失败:', name, e); return false; }
   }
 
   async function discoverDbs() {
@@ -103,7 +104,7 @@
         const list = (await indexedDB.databases()).map(d => d.name).filter(Boolean);
         if (list.length) { lastDiscoverMode = 'databases()'; return list; }
         lastDiscoverMode = 'databases()空,探活兜底';
-      } catch (e) { lastDiscoverMode = 'databases()异常,探活兜底'; warn('databases() 失败', e); }
+      } catch (e) { lastDiscoverMode = 'databases()异常,探活兜底'; error('databases() 失败', e); }
     } else {
       lastDiscoverMode = '无databases(),探活兜底';
     }
@@ -197,6 +198,7 @@
     try {
       db = await openWithTimeout(dbName, 5000);
     } catch (e) {
+      error('打开库失败(跳过):', dbName, e);
       return { __missing: String(e?.message || e) };
     }
     const out = {};
@@ -216,6 +218,7 @@
         out[sn] = { rows: [], keys: keys ? keys.map(k => serializePlain(k)) : null, keyPath: st.keyPath || null };
         for (const row of rows) out[sn].rows.push(await serializeValue(row));
       } catch (e) {
+        error('读取 store 失败:', dbName, sn, e);
         out[sn] = { __error: String(e?.message || e) };
       }
     }
@@ -260,7 +263,7 @@
           for (const r of sd.rows) st.put(await deserializeValue(r));
         }
         await new Promise((res, rej) => { tx.oncomplete = res; tx.onerror = () => rej(tx.error); });
-      } catch (e) { warn('恢复 store 失败', dbName, sn, e); }
+      } catch (e) { error('恢复 store 失败:', dbName, sn, e); }
     }
     db.close();
   }
@@ -321,7 +324,7 @@
 
   async function fetchManifest() {
     try { return JSON.parse(await fetchText(MANIFEST_NAME)); }
-    catch (_) { return null; }
+    catch (e) { error('读取镜像清单失败:', e); return null; }
   }
 
   async function importMirror(force = false) {
@@ -333,7 +336,7 @@
       try {
         const dump = JSON.parse(await fetchText(file));
         await importDb(name, dump);
-      } catch (e) { warn('恢复库失败', name, e); }
+      } catch (e) { error('恢复库失败:', name, e); }
     }
     for (const [k, v] of Object.entries(m.ls || {})) localStorage.setItem(k, v);
     s.lastImportedVersion = m.version;
@@ -518,7 +521,7 @@
           saveSettingsDebounced();
           refresh();
           alert('已删除 ' + files.length + ' 个镜像文件');
-        } catch (e) { alert('删除失败: ' + (e?.message || e)); }
+        } catch (e) { error('删除镜像失败:', e); alert('删除失败: ' + (e?.message || e)); }
       }
     });
 
@@ -532,7 +535,7 @@
     if (!s) return warn('宿主设置不可用');
     if (!s.enabled) return log('已停用');
     await buildPanel();
-    setTimeout(() => importMirror(false).then(v => {
+    setTimeout(() => importMirror(false).catch(e => error('启动自动恢复失败:', e)).then(v => {
       if (v && confirm('[WebView同步] 检测到来自其他设备的新镜像(v' + v + ')，已写入本地存储。\n立即刷新界面让各扩展重新加载配置？\n（取消=稍后自行刷新，期间各扩展可能仍用旧数据）')) location.reload();
     }), 4000);
     log('已启动(动态收集模式)', s.deviceId,

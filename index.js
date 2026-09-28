@@ -43,6 +43,27 @@
     }
   }
 
+  // TT 原生确认弹窗(SillyTavern.getContext().callGenericPopup, 原生 confirm() 被 Tauri WebView 吞)
+  async function popupConfirm(title, message) {
+    try {
+      const ctx = window.SillyTavern?.getContext?.();
+      if (ctx?.Popup?.show?.confirm) {
+        const result = await ctx.Popup.show.confirm(title, message);
+        return result === 1;
+      }
+      if (ctx?.callGenericPopup) {
+        const result = await ctx.callGenericPopup(
+          message,
+          1, // POPUP_TYPE.CONFIRM
+        );
+        return result === 1; // POPUP_RESULT.AFFIRMATIVE
+      }
+    } catch (e) {
+      warn("Popup 不可用:", e);
+    }
+    return confirm(title);
+  }
+
   // ---------- 日志环形缓冲(用户可导出) ----------
   const LOG_MAX = 500;
   const logBuf = [];
@@ -911,12 +932,11 @@
         toast("success", "已重新扫描", "");
       }
       if (act === "wipe") {
-        if (
-          !confirm(
-            "删除已导出的全部镜像文件（user/files 下的 wvs__*.json）？\n下次 TT 同步会把删除同步到其他设备（它们的镜像也会消失），本地 IndexedDB 数据不受影响。",
-          )
-        )
-          return;
+        const okToDelete = await popupConfirm(
+          "删除镜像",
+          "删除已导出的全部镜像文件？下次 TT 同步会把删除同步到其他设备，本地 IndexedDB 数据不受影响。",
+        );
+        if (!okToDelete) return;
         try {
           const m = await fetchManifest();
           const files = [];

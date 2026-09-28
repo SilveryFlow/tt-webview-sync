@@ -9,7 +9,7 @@ export default [
       globals: {
         window: 'readonly', document: 'readonly', console: 'readonly',
         fetch: 'readonly', alert: 'readonly', confirm: 'readonly', location: 'readonly',
-        indexedDB: 'readonly', localStorage: 'readonly', setTimeout: 'readonly',
+        indexedDB: 'readonly', localStorage: 'readonly', sessionStorage: 'readonly', setTimeout: 'readonly',
         URL: 'readonly', Blob: 'readonly', FileReader: 'readonly',
         atob: 'readonly', btoa: 'readonly', clearTimeout: 'readonly', setTimeout: 'readonly', unescape: 'readonly',
         encodeURIComponent: 'readonly', Uint8Array: 'readonly', ArrayBuffer: 'readonly',

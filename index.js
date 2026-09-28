@@ -605,6 +605,11 @@
     if (!s) return log("设置不可用");
     const m = await fetchManifest();
     if (!m) return log("远端无镜像清单");
+    // 防刷新死循环: 本会话已导入过该版本就跳过(settings 落盘是防抖的,页面可能在落盘前刷新)
+    const ssKey = "wvs_imported_v";
+    const ssVal = Number(sessionStorage.getItem(ssKey)) || 0;
+    if (!force && m.version <= ssVal)
+      return log("本会话已导入 v" + ssVal + "，跳过");
     if (
       !force &&
       (m.version <= s.lastImportedVersion || m.version <= s.lastExportVersion)
@@ -640,6 +645,7 @@
     }
     for (const [k, v] of Object.entries(m.ls || {})) localStorage.setItem(k, v);
     s.lastImportedVersion = m.version;
+    sessionStorage.setItem("wvs_imported_v", String(m.version)); // 防刷新死循环闸
     saveSettingsDebounced();
     log("镜像已恢复（来自", m.device, "v", m.version, "），建议重启 TT");
     return m.version;

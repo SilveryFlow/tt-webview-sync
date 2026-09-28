@@ -911,30 +911,12 @@
         toast("success", "已重新扫描", "");
       }
       if (act === "wipe") {
-        // 两步确认(TT WebView 会吞 confirm,用按钮状态代替)
-        const wipeBtn = div.querySelector('[data-act="wipe"]');
-        if (!window.__wvsWipeArmed) {
-          window.__wvsWipeArmed = true;
-          if (wipeBtn) {
-            wipeBtn.dataset.origHtml = wipeBtn.innerHTML;
-            wipeBtn.innerHTML =
-              '<i class="fa-solid fa-triangle-exclamation"></i><span>再点一次确认删除</span>';
-          }
-          toast(
-            "warning",
-            "删除确认",
-            "再点一次「删除镜像」确认删除全部镜像文件",
-          );
-          setTimeout(() => {
-            window.__wvsWipeArmed = false;
-            if (wipeBtn?.dataset.origHtml)
-              wipeBtn.innerHTML = wipeBtn.dataset.origHtml;
-          }, 5000);
+        if (
+          !confirm(
+            "删除已导出的全部镜像文件（user/files 下的 wvs__*.json）？\n下次 TT 同步会把删除同步到其他设备（它们的镜像也会消失），本地 IndexedDB 数据不受影响。",
+          )
+        )
           return;
-        }
-        window.__wvsWipeArmed = false;
-        if (wipeBtn?.dataset.origHtml)
-          wipeBtn.innerHTML = wipeBtn.dataset.origHtml;
         try {
           const m = await fetchManifest();
           const files = [];

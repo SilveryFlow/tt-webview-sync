@@ -1,0 +1,12 @@
+{
+    "display_name": "WebView 存储同步器 (webview-sync)",
+    "loading_order": 5,
+    "requires": [],
+    "optional": [],
+    "js": "index.js",
+    "css": "style.css",
+    "author": "zcode",
+    "version": "0.1.0",
+    "homePage": "https://github.com/SilveryFlow/tt-webview-sync",
+    "auto_update": true
+}

@@ -346,7 +346,7 @@
       const m = s.mirror;
       $st.textContent = m
         ? `镜像 v${m.version} @${m.device} · 库 ${Object.keys(m.dbs || {}).length} · ls ${Object.keys(m.ls || {}).length} · 跳过 ${(m.skipped || []).length} · 已导入 ${s.lastImportedVersion || '无'}`
-        : '尚无镜像';
+        : '尚无镜像——点「导出镜像到同步」生成第一份（之后随 TT 同步自动到其他设备）';
     };
     refresh();
     $('.ws-limit').value = s.blobLimitKb;

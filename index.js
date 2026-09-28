@@ -15,7 +15,7 @@
     dbPick: {},
     lsPick: {},
     // 默认排除（纯缓存/可再生）
-    dbExclude: ['yuzi-phone-cache'],
+    dbExclude: [],
     lsExclude: [],
     blobLimitKb: 0,          // 单 Blob 上限(KB)，0=不限制
     autoExportOnSave: false,

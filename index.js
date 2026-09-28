@@ -28,8 +28,29 @@
     lastExportVersion: 0,
   };
 
-  const log = (...a) => console.log('[webview-sync]', ...a);
-  const warn = (...a) => console.warn('[webview-sync]', ...a);
+  // ---------- 日志环形缓冲(用户可导出) ----------
+  const LOG_MAX = 500;
+  const logBuf = [];
+  function record(level, args) {
+    logBuf.push(`[${new Date().toISOString()}] [${level}] ` + args.map(a => {
+      if (a instanceof Error) return a.stack || String(a);
+      if (typeof a === 'object') { try { return JSON.stringify(a).slice(0, 200); } catch (_) { return String(a); } }
+      return String(a);
+    }).join(' '));
+    if (logBuf.length > LOG_MAX) logBuf.shift();
+  }
+  const log = (...a) => { record('INFO', a); console.log('[webview-sync]', ...a); };
+  const warn = (...a) => { record('WARN', a); console.warn('[webview-sync]', ...a); };
+  function exportLog() {
+    const text = logBuf.join('\n') || '(无日志)';
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'webview-sync-log.txt'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+    return text.split('\n').length;
+  }
+  window.__webviewSyncExportLog = exportLog;
 
   function getSettings() {
     const es = (window.SillyTavern?.getContext?.()?.extensionSettings) || window.extension_settings;
@@ -269,16 +290,21 @@
   async function exportMirror() {
     const s = getSettings(); if (!s) throw new Error('设置不可用');
     skipped.length = 0;
+    log('导出开始...');
     const found = await discoverDbs();
     const picked = found.filter(n => pickDb(s, n));
+    log('发现', found.length, '库, 勾选', picked.length, '| 模式:', lastDiscoverMode);
     const ls = {};
     for (const k of discoverLsKeys()) if (pickLs(s, k)) ls[k] = localStorage.getItem(k);
 
     // 先写数据文件，最后写清单（清单=提交点；对端只见新清单即视为新镜像）
     const exports = {};
     for (const name of picked) {
+      log('导出库:', name);
       const dump = await exportDb(name);
-      await uploadText(dbFileName(name), JSON.stringify(dump));
+      const json = JSON.stringify(dump);
+      log('库', name, '序列化完成', Math.round(json.length / 1024), 'KB');
+      await uploadText(dbFileName(name), json);
       exports[name] = dbFileName(name);
     }
     const version = Date.now();
@@ -344,6 +370,9 @@
                 </button>
                 <button type="button" class="menu_button" data-act="wipe">
                   <i class="fa-solid fa-trash-can"></i><span>删除云端镜像</span>
+                </button>
+                <button type="button" class="menu_button" data-act="log">
+                  <i class="fa-solid fa-file-export"></i><span>导出日志</span>
                 </button>
               </div>
 

@@ -46,26 +46,33 @@
   // 倒计时刷新: toast 文本实时倒数 3→1 秒,到 0 刷新
   function countdownReload(seconds = 3) {
     const t = window.SillyTavern?.getContext?.()?.toastr || window.toastr;
+    if (!t?.info) {
+      setTimeout(() => location.reload(), seconds * 1000);
+      return;
+    }
     let remaining = seconds;
-    const update = () => {
+    const toastEl = t.info(`${remaining} 秒后自动刷新界面`, "WebView同步", {
+      timeOut: (seconds + 1) * 1000,
+      extendedTimeOut: 0,
+    });
+    const tick = setInterval(() => {
+      remaining--;
       if (remaining <= 0) {
+        clearInterval(tick);
         location.reload();
         return;
       }
-      const msg = `${remaining} 秒后自动刷新界面…`;
-      if (t?.info && remaining === seconds) {
-        // 首次弹 toast(长驻),后续 toast 自己更新不了文本,用 console 辅助
-        t.info(msg, "WebView同步", {
-          timeOut: seconds * 1000,
-          extendedTimeOut: 0,
-        });
-      } else {
-        log(msg);
-      }
-      remaining--;
-      setTimeout(update, 1000);
-    };
-    update();
+      // toastr 返回 jQuery 包装的 DOM,直接改文本实现倒数
+      try {
+        const el =
+          typeof toastEl?.find === "function"
+            ? toastEl
+            : window.jQuery
+              ? window.jQuery(toastEl)
+              : null;
+        el?.find(".toast-message").text(`${remaining} 秒后自动刷新界面`);
+      } catch (_) {}
+    }, 1000);
   }
 
   // TT 原生确认弹窗(SillyTavern.getContext().callGenericPopup, 原生 confirm() 被 Tauri WebView 吞)

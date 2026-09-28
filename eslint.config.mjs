@@ -12,6 +12,7 @@ export default [
         indexedDB: 'readonly', localStorage: 'readonly', sessionStorage: 'readonly', setTimeout: 'readonly',
         URL: 'readonly', Blob: 'readonly', FileReader: 'readonly',
         atob: 'readonly', btoa: 'readonly', clearTimeout: 'readonly', setTimeout: 'readonly', unescape: 'readonly',
+        setInterval: 'readonly', clearInterval: 'readonly',
         encodeURIComponent: 'readonly', Uint8Array: 'readonly', ArrayBuffer: 'readonly',
         TextEncoder: 'readonly', TextDecoder: 'readonly',
         CompressionStream: 'readonly', DecompressionStream: 'readonly',

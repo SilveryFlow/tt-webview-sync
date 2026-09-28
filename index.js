@@ -657,16 +657,14 @@
     if (!s) return log("设置不可用");
     const m = await fetchManifest();
     if (!m) return log("远端无镜像清单");
-    // 防刷新死循环: 本会话已导入过该版本就跳过(settings 落盘是防抖的,页面可能在落盘前刷新)
-    const ssKey = "wvs_imported_v";
-    const ssVal = Number(sessionStorage.getItem(ssKey)) || 0;
-    if (!force && m.version <= ssVal)
-      return log("本会话已导入 v" + ssVal + "，跳过");
-    if (
-      !force &&
-      (m.version <= s.lastImportedVersion || m.version <= s.lastExportVersion)
-    )
-      return log("无需导入");
+    // 防刷新死循环: localStorage 跨刷新可靠(不用 settings 里的版本号——它会随 settings.json 同步到新设备导致误挡)
+    const importedV = Number(localStorage.getItem("wvs_imported_v")) || 0;
+    if (!force && m.version <= importedV)
+      return log("已导入过 v" + importedV + "，跳过");
+    // 冷却期: 距上次导入不足 30 秒不再触发(防循环兜底)
+    const lastTs = Number(localStorage.getItem("wvs_last_import_ts")) || 0;
+    if (!force && Date.now() - lastTs < 30000)
+      return log("冷却期内,跳过自动恢复");
     for (const [name, ref] of Object.entries(m.exports || {})) {
       try {
         let json;
@@ -697,7 +695,8 @@
     }
     for (const [k, v] of Object.entries(m.ls || {})) localStorage.setItem(k, v);
     s.lastImportedVersion = m.version;
-    sessionStorage.setItem("wvs_imported_v", String(m.version)); // 防刷新死循环闸
+    localStorage.setItem("wvs_imported_v", String(m.version));
+    localStorage.setItem("wvs_last_import_ts", String(Date.now()));
     saveSettingsDebounced();
     log("镜像已恢复（来自", m.device, "v", m.version, "），建议重启 TT");
     return m.version;
@@ -1005,17 +1004,18 @@
     if (!s) return warn("宿主设置不可用");
     if (!s.enabled) return log("已停用");
     await buildPanel();
-    setTimeout(
-      () =>
-        importMirror(false)
-          .catch((e) => error("启动自动恢复失败:", e))
-          .then((v) => {
-            if (v) {
-              countdownReload(3);
-            }
-          }),
-      4000,
-    );
+    setTimeout(() => {
+      // 启动安全阀: 15 秒内已刷新过就不再自动恢复(终极防循环)
+      const bootGuard = Number(localStorage.getItem("wvs_boot_guard")) || 0;
+      if (Date.now() - bootGuard < 15000)
+        return log("启动安全阀: 距上次刷新不足 15s, 跳过自动恢复");
+      localStorage.setItem("wvs_boot_guard", String(Date.now()));
+      importMirror(false)
+        .catch((e) => error("启动自动恢复失败:", e))
+        .then((v) => {
+          if (v) countdownReload(3);
+        });
+    }, 4000);
     log(
       "已启动(动态收集模式)",
       s.deviceId,

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** 提交前检查: node语法 + 引用完整性 + 按钮/分支覆盖 + manifest版本。 */
+/** 提交前检查: node语法 + ESLint(含 no-undef 常量完整性) + 按钮/分支覆盖 + manifest版本。 */
 import { readFileSync, copyFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
@@ -8,29 +8,27 @@ import { join } from 'node:path';
 const js = readFileSync('src/index.js', 'utf8');
 const errors = [];
 
-// 1) 语法
+// 1) node 语法
 const tmp = mkdtempSync(join(tmpdir(), 'wvs-'));
 copyFileSync('src/index.js', join(tmp, 'check.cjs'));
 try { execSync(`node --check ${join(tmp, 'check.cjs')}`, { stdio: 'pipe' }); }
 catch (e) { errors.push('语法错误:\n' + e.stderr); }
+rmSync(tmp, { recursive: true, force: true });
 
-// 2) 字符串抠掉后的大写常量引用完整性
-const SQ = String.fromCharCode(39);
-const DQ = String.fromCharCode(34);
-const BT = String.fromCharCode(96);
-const BS = String.fromCharCode(92);
-const stripRe = (q) => new RegExp(q + '(?:[^' + q + BS + BS + ']|' + BS + BS + '.)*' + q, 'g');
-const stripped = js.replace(stripRe(SQ), SQ + SQ).replace(stripRe(DQ), DQ + DQ).replace(stripRe(BT), BT + BT);
-const defined = new Set(
-  [...stripped.matchAll(/\b(?:const|let)\s+([A-Za-z_$][\w$]*)/g), ...stripped.matchAll(/\bfunction\s+([A-Za-z_$][\w$]*)/g)].map(m => m[1]),
-);
-for (const m of stripped.matchAll(/\b([A-Z][A-Z0-9_]{2,})\b/g)) {
-  if (!defined.has(m[1])) errors.push(`未定义常量被引用: ${m[1]}`);
+// 2) ESLint(含 no-undef——未定义变量/常量在这里拦截, globals 已在 eslint.config.mjs 声明)
+try {
+  const out = execSync('npx eslint src/index.js', { stdio: 'pipe', encoding: 'utf8' });
+} catch (e) {
+  const lint = (e.stdout || '') + (e.stderr || '');
+  // 有 error 就拦( warning 放行 )
+  if (/\d+\s+errors?/.test(lint) || /error\b/.test(lint)) {
+    errors.push('ESLint 有 error:\n' + lint.slice(0, 800));
+  }
 }
 
-// 3) data-act 按钮必须有处理分支
+// 3) data-act 按钮必须有处理分支(在原始源码上查, 不受格式化影响)
 const btns = [...new Set([...js.matchAll(/data-act="(\w+)"/g)].map(m => m[1]))];
-const handled = new Set([...js.matchAll(/act === '(\w+)'/g)].map(m => m[1]));
+const handled = new Set([...js.matchAll(/act\s*===?\s*['"](\w+)['"]/g)].map(m => m[1]));
 const missing = btns.filter(b => !handled.has(b));
 if (missing.length) errors.push(`按钮无处理分支: ${missing}`);
 
@@ -43,7 +41,6 @@ if (process.env.SKIP_VERSION !== '1') {
     if (vt(cur.version) <= vt(head.version)) errors.push(`版本未升级 HEAD=${head.version} cur=${cur.version}`);
   } catch { /* 首次提交 */ }
 }
-rmSync(tmp, { recursive: true, force: true });
 
 if (errors.length) { console.error('✗ check 失败:'); errors.forEach(e => console.error(' -', e)); process.exit(1); }
-console.log(`✓ check 通过 (按钮 ${btns.length}, 常量定义 ${defined.size})`);
+console.log(`✓ check 通过 (按钮 ${btns.length}/${btns.length} 有分支, ESLint 无 error)`);

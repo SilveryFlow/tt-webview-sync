@@ -43,6 +43,31 @@
     }
   }
 
+  // 倒计时刷新: toast 文本实时倒数 3→1 秒,到 0 刷新
+  function countdownReload(seconds = 3) {
+    const t = window.SillyTavern?.getContext?.()?.toastr || window.toastr;
+    let remaining = seconds;
+    const update = () => {
+      if (remaining <= 0) {
+        location.reload();
+        return;
+      }
+      const msg = `${remaining} 秒后自动刷新界面…`;
+      if (t?.info && remaining === seconds) {
+        // 首次弹 toast(长驻),后续 toast 自己更新不了文本,用 console 辅助
+        t.info(msg, "WebView同步", {
+          timeOut: seconds * 1000,
+          extendedTimeOut: 0,
+        });
+      } else {
+        log(msg);
+      }
+      remaining--;
+      setTimeout(update, 1000);
+    };
+    update();
+  }
+
   // TT 原生确认弹窗(SillyTavern.getContext().callGenericPopup, 原生 confirm() 被 Tauri WebView 吞)
   async function popupConfirm(title, message) {
     try {
@@ -900,12 +925,7 @@
           const v = await importMirror(true);
           await refresh();
           if (v) {
-            toast(
-              "success",
-              "WebView同步",
-              "已从镜像恢复 v" + v + "，3 秒后自动刷新界面",
-            );
-            setTimeout(() => location.reload(), 3000);
+            countdownReload(3);
           } else
             toast("info", "WebView同步", "无需导入（远端没有比本地新的镜像）");
         } catch (err) {
@@ -987,12 +1007,7 @@
           .catch((e) => error("启动自动恢复失败:", e))
           .then((v) => {
             if (v) {
-              toast(
-                "success",
-                "WebView同步",
-                "检测到来自其他设备的新镜像(v" + v + ")，3 秒后自动刷新界面",
-              );
-              setTimeout(() => location.reload(), 3000);
+              countdownReload(3);
             }
           }),
       4000,

@@ -80,22 +80,27 @@ async function gunzipText(b64) {
 }
 
 export async function uploadBlob(name, blob) {
-  // 压缩(JSON 文本 gzip 后通常只剩 10~20%),标记前缀区分
-  let payloadB64;
+  // 压缩(JSON 文本 gzip 后通常只剩 10~20%),标记前缀区分。
+  // 线格式: data = base64(整个文件内容)——压缩文件的"内容"本身是 "wvsgz:"+内层base64 文本,
+  // magic 在文件里而不裸放 data 字段(裸放会让后端 base64 解码在 ':' 处炸 400)。
+  let data;
+  let compressedLen = 0;
   try {
-    payloadB64 = GZ_MAGIC + (await gzipBlobToB64(blob));
+    const payload = GZ_MAGIC + (await gzipBlobToB64(blob)); // 纯 ASCII
+    compressedLen = payload.length;
+    data = btoa(payload); // ASCII 单趟直编,免 TextEncoder
     log(
-      `压缩 ${name}: ${Math.round(blob.size / 1024)}KB -> ${Math.round(payloadB64.length / 1024)}KB`,
+      `压缩 ${name}: ${Math.round(blob.size / 1024)}KB -> ${Math.round(compressedLen / 1024)}KB`,
     );
   } catch (e) {
     warn(`压缩失败,原始上传 ${name}:`, e);
-    payloadB64 = base64FromText(await blob.text());
+    data = base64FromText(await blob.text()); // 原文可能含中文,须走 TextEncoder
   }
-  // 手拼 body: base64 字符集无引号/反斜杠,免去 JSON.stringify 对十余 MB 数据的转义扫描
+  // 手拼 body: data 为纯 base64 字母表,免 JSON.stringify 对大载荷的转义扫描
   const r = await fetch(API_UPLOAD, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...reqHeaders() },
-    body: '{"name":' + JSON.stringify(name) + ',"data":"' + payloadB64 + '"}',
+    body: '{"name":' + JSON.stringify(name) + ',"data":"' + data + '"}',
   });
   if (!r.ok)
     throw new Error(

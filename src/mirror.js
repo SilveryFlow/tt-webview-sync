@@ -234,7 +234,9 @@ export async function fetchManifest() {
   try {
     return JSON.parse(await fetchText(MANIFEST_NAME));
   } catch (e) {
-    error("读取镜像清单失败:", e);
+    // 404 = 尚无镜像(首次使用/已清空)是正常态,降级为 info 免刷屏;其余照旧报错
+    if (String(e?.message || e).includes("-> 404")) log("远端尚无镜像清单");
+    else error("读取镜像清单失败:", e);
     return null;
   }
 }

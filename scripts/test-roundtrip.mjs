@@ -35,6 +35,8 @@ const watchdog = setTimeout(() => {
 }, 30000);
 
 const { exportDbNd, importDbNd } = await import("../src/mirror.js");
+const { uploadBlob } = await import("../src/transfer.js");
+const zlib = await import("node:zlib");
 
 const DB = "wvs-test-db";
 let failed = 0;
@@ -42,6 +44,32 @@ const ok = (cond, msg) => {
   if (cond) console.log(`  ✓ ${msg}`);
   else { failed++; console.error(`  ✗ ${msg}`); }
 };
+
+// ---------- 0) 上传线格式回归(v0.15.4 曾把 wvsgz: 裸放进 data 字段 → 后端 base64 解码 400) ----------
+// data 必须是"整个文件内容"的 base64; 压缩文件内容 = "wvsgz:" + 内层base64(gzip)。
+// 用 node:zlib 做独立实现交叉验证, 不复用被测代码的解压逻辑。
+{
+  const orig = "hello 中文 line1\nline2\n";
+  let captured = null;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    captured = { url: String(url), body: init?.body };
+    return { ok: true, status: 200, text: async () => "" };
+  };
+  try {
+    await uploadBlob("test-upload.bin", new Blob([orig]));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+  const m = captured?.body?.match(/^{"name":"test-upload.bin","data":"(.+)"}$/s);
+  ok(!!m && captured.url.includes("/api/files/upload"), "上传 body 结构与端点正确");
+  if (m) {
+    const fileText = Buffer.from(m[1], "base64").toString("utf8");
+    ok(fileText.startsWith("wvsgz:"), "文件内容带 wvsgz: 前缀(magic 在文件里,不裸放 data 字段)");
+    const raw = zlib.gunzipSync(Buffer.from(fileText.slice(6), "base64")).toString("utf8");
+    ok(raw === orig, "内层 gzip 独立解压还原原文");
+  }
+}
 
 // ---------- 1) 建库写入 ----------
 const seed = {

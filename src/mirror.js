@@ -18,6 +18,7 @@ import {
 } from "./discover.js";
 import {
   uploadText,
+  uploadBlob,
   deleteText,
   fetchText,
   ndFileName,
@@ -30,6 +31,20 @@ import {
 } from "./serialize.js";
 
 export const skipped = []; // 最近一次导出被跳过的项(面板提示用)
+
+// 分段并行上传池(压缩与传输重叠, gzip 走原生线程池)
+const UPLOAD_PARALLEL = 3;
+async function runPool(items, limit, fn) {
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, async () => {
+      while (next < items.length) {
+        const idx = next++;
+        await fn(items[idx], idx);
+      }
+    }),
+  );
+}
 
 export async function exportDbNd(dbName) {
   // NDJSON 流式导出。行协议：
@@ -69,30 +84,27 @@ export async function exportDbNd(dbName) {
   for (const sn of storeNames) {
     try {
       emit(JSON.stringify({ s: sn, begin: 1 }) + "\n");
-      // 同步游标收集——事务内零 await。Blob 行的 FileReader 是宏任务，
-      // 真浏览器里事务会先自动提交，之后 cur.continue() 抛 TransactionInactiveError
-      // 且异常被 promise 链吞掉=导出永久悬挂(douluo-main-text-assets 实证)。
-      // 先同步收集键值(结构化克隆副本，事务外仍有效)，再逐行序列化。
-      const recs = await new Promise((resolve, reject) => {
-        const acc = [];
-        const q = db.transaction(sn, "readonly").objectStore(sn).openCursor();
-        q.onsuccess = () => {
-          const cur = q.result;
-          if (!cur) return resolve(acc);
-          acc.push([
-            schema[sn] === null ? serializePlain(cur.key) : null,
-            cur.value,
-          ]);
-          cur.continue();
-        };
-        q.onerror = () => reject(q.error);
+      // getAll/getAllKeys 批量读(引擎级,一次请求取整 store,远快于逐行游标);
+      // 两个请求在事务回调外同步发出、oncomplete 一次性收——事务内零 await
+      // (Blob 行的 FileReader 是宏任务,真浏览器里事务会先自动提交,
+      //  之后 cur.continue() 抛 TransactionInactiveError 且被吞=永久悬挂,v0.15.2 实证)。
+      // 值是结构化克隆副本,事务提交后仍有效,可从容逐行序列化。
+      const { vals, keys } = await new Promise((resolve, reject) => {
+        const tx = db.transaction(sn, "readonly");
+        const st = tx.objectStore(sn);
+        const vq = st.getAll();
+        const kq = st.keyPath ? null : st.getAllKeys();
+        tx.oncomplete = () => resolve({ vals: vq.result, keys: kq?.result });
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error || new Error("事务中止"));
       });
-      for (const [k, v] of recs) {
+      const outOfLine = schema[sn] === null;
+      for (let i = 0; i < vals.length; i++) {
         emit(
           JSON.stringify({
             s: sn,
-            k,
-            r: await serializeValue(v),
+            k: outOfLine ? serializePlain(keys[i]) : null,
+            r: await serializeValue(vals[i]),
           }) + "\n",
         );
         rows++;
@@ -157,20 +169,24 @@ export async function exportMirror() {
       nd.chunks.length,
       "段",
     );
-    if (nd.chunks.length <= 1) {
-      await uploadText(ndFileName(name), await nd.chunks[0].text());
-      exports[name] = { file: ndFileName(name), chunks: 0, fmt: "nd" };
-    } else {
-      for (let ci = 0; ci < nd.chunks.length; ci++) {
-        await uploadText(ndFileName(name, ci + 1), await nd.chunks[ci].text());
-        log(`库 ${name} 分段 ${ci + 1}/${nd.chunks.length} 上传完成`);
+      if (nd.chunks.length <= 1) {
+        await uploadBlob(ndFileName(name), nd.chunks[0]);
+        exports[name] = { file: ndFileName(name), chunks: 0, fmt: "nd" };
+      } else {
+        await runPool(
+          nd.chunks,
+          UPLOAD_PARALLEL,
+          async (chunk, ci) => {
+            await uploadBlob(ndFileName(name, ci + 1), chunk);
+            log(`库 ${name} 分段 ${ci + 1}/${nd.chunks.length} 上传完成`);
+          },
+        );
+        exports[name] = {
+          file: ndFileName(name, 1),
+          chunks: nd.chunks.length,
+          fmt: "nd",
+        };
       }
-      exports[name] = {
-        file: ndFileName(name, 1),
-        chunks: nd.chunks.length,
-        fmt: "nd",
-      };
-    }
   }
   const version = Date.now();
   await uploadText(
@@ -286,7 +302,7 @@ export async function importDbNd(dbName, ref) {
   const begun = new Set();
   const cleared = new Set();
   const deadStores = new Set();
-  const BATCH = 200;
+  const BATCH = 500;
 
   const txDone = (tx) =>
     new Promise((res, rej) => {

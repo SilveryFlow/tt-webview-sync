@@ -19,14 +19,22 @@ function base64FromText(text) {
   return btoa(binary);
 }
 
-async function gzipText(text) {
-  // CompressionStream 流式压缩 → base64 文本
-  const cs = new CompressionStream("gzip");
-  const writer = cs.writable.getWriter();
-  const reader = cs.readable.getReader();
-  const encode = new TextEncoder().encode(text);
-  writer.write(encode);
-  writer.close();
+function bytesToBase64(bytes) {
+  let binary = "";
+  const STEP = 32768;
+  for (let i = 0; i < bytes.length; i += STEP) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + STEP));
+  }
+  return btoa(binary);
+}
+
+async function gzipBlobToB64(blob) {
+  // Blob 流直连 CompressionStream——省掉 blob.text()(UTF-8→UTF-16) 和
+  // TextEncoder(UTF-16→UTF-8) 的一来一回双重全量编码
+  const reader = blob
+    .stream()
+    .pipeThrough(new CompressionStream("gzip"))
+    .getReader();
   const chunks = [];
   let total = 0;
   while (true) {
@@ -41,13 +49,7 @@ async function gzipText(text) {
     gz.set(c, off);
     off += c.length;
   }
-  // Uint8Array → base64
-  let binary = "";
-  const STEP = 32768;
-  for (let i = 0; i < gz.length; i += STEP) {
-    binary += String.fromCharCode(...gz.subarray(i, i + STEP));
-  }
-  return btoa(binary);
+  return bytesToBase64(gz);
 }
 
 async function gunzipText(b64) {
@@ -77,25 +79,23 @@ async function gunzipText(b64) {
   return new TextDecoder().decode(out);
 }
 
-export async function uploadText(name, text) {
+export async function uploadBlob(name, blob) {
   // 压缩(JSON 文本 gzip 后通常只剩 10~20%),标记前缀区分
-  let payload = text;
+  let payloadB64;
   try {
-    const gz = await gzipText(text);
-    payload = GZ_MAGIC + gz;
+    payloadB64 = GZ_MAGIC + (await gzipBlobToB64(blob));
     log(
-      `压缩 ${name}: ${Math.round(text.length / 1024)}KB -> ${Math.round(gz.length / 1024)}KB`,
+      `压缩 ${name}: ${Math.round(blob.size / 1024)}KB -> ${Math.round(payloadB64.length / 1024)}KB`,
     );
   } catch (e) {
     warn(`压缩失败,原始上传 ${name}:`, e);
-    // 压缩失败回退为分段的原始 base64
-    payload = text;
+    payloadB64 = base64FromText(await blob.text());
   }
-  // 分段 base64(payload 可能含中文,btoa 不认,需分段转)
+  // 手拼 body: base64 字符集无引号/反斜杠,免去 JSON.stringify 对十余 MB 数据的转义扫描
   const r = await fetch(API_UPLOAD, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...reqHeaders() },
-    body: JSON.stringify({ name, data: base64FromText(payload) }),
+    body: '{"name":' + JSON.stringify(name) + ',"data":"' + payloadB64 + '"}',
   });
   if (!r.ok)
     throw new Error(
@@ -106,6 +106,10 @@ export async function uploadText(name, text) {
         ": " +
         (await r.text()).slice(0, 200),
     );
+}
+
+export function uploadText(name, text) {
+  return uploadBlob(name, new Blob([text]));
 }
 
 export async function deleteText(fileName) {

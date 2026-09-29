@@ -113,25 +113,34 @@ export async function buildPanel() {
     try {
       if ($dbMeta) $dbMeta.textContent = "（扫描中…）";
       const names = await discoverDbs();
+      // 逐库开连接查 store 清单——并行跑,25 库不用串行等 25 轮
+      const infos = await Promise.all(
+        names.map(async (n) => {
+          try {
+            const db = await openWithTimeout(n);
+            const stores = [...db.objectStoreNames].join(", ");
+            db.close();
+            return {
+              info: stores ? `(${stores.slice(0, 60)})` : "(空)",
+              title: stores || "(空)",
+            };
+          } catch (e) {
+            return {
+              info: `(无法打开: ${String(e?.message || e).slice(0, 30)})`,
+              title: `无法打开: ${String(e?.message || e)}`,
+            };
+          }
+        }),
+      );
       $dbl.innerHTML = "";
-      for (const n of names) {
+      for (let i = 0; i < names.length; i++) {
+        const n = names[i];
+        const { info, title } = infos[i];
         const row = document.createElement("label");
         row.className = "ws-item";
         const checked = pickDb(s, n);
         const excluded = s.dbExclude.includes(n);
-        let info = "";
-        let infoTitle = "";
-        try {
-          const db = await openWithTimeout(n);
-          const stores = [...db.objectStoreNames].join(", ");
-          db.close();
-          info = stores ? `(${stores.slice(0, 60)})` : "(空)";
-          infoTitle = stores || "(空)";
-        } catch (e) {
-          info = `(无法打开: ${String(e?.message || e).slice(0, 30)})`;
-          infoTitle = `无法打开: ${String(e?.message || e)}`;
-        }
-        row.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""} ${excluded ? 'title="默认排除(缓存类)，勾选可强制同步"' : ""}> <span class="ws-name" title="${n}">${n}</span> <span class="ws-info" title="${infoTitle}">${info}</span>`;
+        row.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""} ${excluded ? 'title="默认排除(缓存类)，勾选可强制同步"' : ""}> <span class="ws-name" title="${n}">${n}</span> <span class="ws-info" title="${title}">${info}</span>`;
         row.querySelector("input").addEventListener("change", (e) => {
           s.dbPick[n] = e.target.checked;
           saveSettingsDebounced();

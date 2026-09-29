@@ -69,28 +69,34 @@ export async function exportDbNd(dbName) {
   for (const sn of storeNames) {
     try {
       emit(JSON.stringify({ s: sn, begin: 1 }) + "\n");
-      await new Promise((resolve, reject) => {
+      // 同步游标收集——事务内零 await。Blob 行的 FileReader 是宏任务，
+      // 真浏览器里事务会先自动提交，之后 cur.continue() 抛 TransactionInactiveError
+      // 且异常被 promise 链吞掉=导出永久悬挂(douluo-main-text-assets 实证)。
+      // 先同步收集键值(结构化克隆副本，事务外仍有效)，再逐行序列化。
+      const recs = await new Promise((resolve, reject) => {
+        const acc = [];
         const q = db.transaction(sn, "readonly").objectStore(sn).openCursor();
         q.onsuccess = () => {
           const cur = q.result;
-          if (!cur) return resolve();
-          serializeValue(cur.value).then(
-            (sv) => {
-              emit(
-                JSON.stringify({
-                  s: sn,
-                  k: schema[sn] === null ? serializePlain(cur.key) : null,
-                  r: sv,
-                }) + "\n",
-              );
-              rows++;
-              cur.continue();
-            },
-            reject,
-          );
+          if (!cur) return resolve(acc);
+          acc.push([
+            schema[sn] === null ? serializePlain(cur.key) : null,
+            cur.value,
+          ]);
+          cur.continue();
         };
         q.onerror = () => reject(q.error);
       });
+      for (const [k, v] of recs) {
+        emit(
+          JSON.stringify({
+            s: sn,
+            k,
+            r: await serializeValue(v),
+          }) + "\n",
+        );
+        rows++;
+      }
     } catch (e) {
       // begin 已发出则对端可能已写入部分行——记 err 行让对端停写该 store，下次导出自愈
       error("读取 store 失败:", dbName, sn, e);

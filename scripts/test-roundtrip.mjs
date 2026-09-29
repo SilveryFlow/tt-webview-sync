@@ -12,6 +12,28 @@ globalThis.localStorage = {
 };
 await import("fake-indexeddb/auto");
 
+// FileReader 多态桩(Node 无原生 FileReader; blob.arrayBuffer() 是真宏任务——
+// 恰好复现真浏览器里"游标回调内 await FileReader → 事务自动提交"的悬挂坑)
+globalThis.FileReader = class {
+  readAsDataURL(blob) {
+    blob.arrayBuffer().then(
+      (buf) => {
+        this.result =
+          "data:application/octet-stream;base64," +
+          Buffer.from(buf).toString("base64");
+        this.onload?.();
+      },
+      (e) => this.onerror?.(e),
+    );
+  }
+};
+
+// 看门狗: 导出/导入若悬挂(事务自动提交坑) 30 秒后报错退出, 不让 CI 干等
+const watchdog = setTimeout(() => {
+  console.error("✗ 测试超时: 疑似事务悬挂(游标回调内宏任务导致自动提交)");
+  process.exit(1);
+}, 30000);
+
 const { exportDbNd, importDbNd } = await import("../src/mirror.js");
 
 const DB = "wvs-test-db";
@@ -34,6 +56,7 @@ const seed = {
   ] },
   blobs: { store: "blobs", keyPath: "id", rows: [
     { id: "ab1", payload: new Uint8Array([1, 2, 3, 250, 255]).buffer },
+    { id: "img1", payload: new Blob([new Uint8Array([9, 8, 7, 6])], { type: "image/png" }) },
   ] },
 };
 await new Promise((res, rej) => {
@@ -59,7 +82,7 @@ await new Promise((res, rej) => {
 // ---------- 2) 流式导出 ----------
 const nd = await exportDbNd(DB);
 ok(!nd.err, `导出无错误${nd.err ? ": " + nd.err : ""}`);
-ok(nd.rows === 6, `行数 6 (实际 ${nd.rows})`);
+ok(nd.rows === 7, `行数 7 (实际 ${nd.rows})`);
 ok(nd.chunks.length >= 1, `段数 ${nd.chunks.length} >= 1`);
 const fullText = (await Promise.all(nd.chunks.map((c) => c.text()))).join("");
 const lines = fullText.split("\n").filter(Boolean);
@@ -104,8 +127,12 @@ ok(meta.length === 3 && meta.every((r) => seed.meta.rows.some((s) => s.id === r.
 ok(kv.length === 2 && kv.some((r) => r.k === "alpha" && r.v.count === 1) && kv.some((r) => r.k === "中文键" && r.v.路径[1] === "偏航"),
   `kv 2 条含中文键 (实际 ${kv.length})`);
 const abv = blobs[0]?.v?.payload;
-ok(blobs.length === 1 && abv instanceof ArrayBuffer && new Uint8Array(abv).join(",") === "1,2,3,250,255",
+ok(blobs.length === 2 && abv instanceof ArrayBuffer && new Uint8Array(abv).join(",") === "1,2,3,250,255",
   "ArrayBuffer 标记对象还原");
+const blb = blobs[1]?.v?.payload;
+const blbBytes = blb instanceof Blob ? [...new Uint8Array(await blb.arrayBuffer())].join(",") : "";
+ok(blb instanceof Blob && blb.type === "image/png" && blbBytes === "9,8,7,6",
+  `Blob 标记对象还原(type=${blb?.type}, bytes=${blbBytes})`);
 
 // ---------- 5) 清空语义: out-of-line store 里的陈旧记录应被清掉 ----------
 {
@@ -146,5 +173,6 @@ ok(blobs.length === 1 && abv instanceof ArrayBuffer && new Uint8Array(abv).join(
 }
 
 await new Promise((res) => { const q = indexedDB.deleteDatabase(DB); q.onsuccess = q.onblocked = q.onerror = () => res(); });
+clearTimeout(watchdog);
 if (failed) { console.error(`✗ 往返测试失败 ${failed} 项`); process.exit(1); }
 console.log("✓ NDJSON 往返测试全部通过");

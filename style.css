@@ -15,16 +15,8 @@
   grid-template-columns: 1fr 1fr 1fr 1fr;
 }
 @media (max-width: 600px) {
-  #webview-sync-panel .ws-grid3,
   #webview-sync-panel .ws-grid4 {
     grid-template-columns: 1fr 1fr;
-  }
-}
-@media (max-width: 400px) {
-  #webview-sync-panel .ws-grid2,
-  #webview-sync-panel .ws-grid3,
-  #webview-sync-panel .ws-grid4 {
-    grid-template-columns: 1fr;
   }
 }
 #webview-sync-panel .ws-actions .menu_button {

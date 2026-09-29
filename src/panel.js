@@ -120,15 +120,18 @@ export async function buildPanel() {
         const checked = pickDb(s, n);
         const excluded = s.dbExclude.includes(n);
         let info = "";
+        let infoTitle = "";
         try {
           const db = await openWithTimeout(n);
-          info = [...db.objectStoreNames].join(",");
+          const stores = [...db.objectStoreNames].join(", ");
           db.close();
-          info = info ? `(${info.slice(0, 60)})` : "(空)";
+          info = stores ? `(${stores.slice(0, 60)})` : "(空)";
+          infoTitle = stores || "(空)";
         } catch (e) {
           info = `(无法打开: ${String(e?.message || e).slice(0, 30)})`;
+          infoTitle = `无法打开: ${String(e?.message || e)}`;
         }
-        row.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""} ${excluded ? 'title="默认排除(缓存类)，勾选可强制同步"' : ""}> <span class="ws-name">${n}</span> <span class="ws-info">${info}</span>`;
+        row.innerHTML = `<input type="checkbox" ${checked ? "checked" : ""} ${excluded ? 'title="默认排除(缓存类)，勾选可强制同步"' : ""}> <span class="ws-name" title="${n}">${n}</span> <span class="ws-info" title="${infoTitle}">${info}</span>`;
         row.querySelector("input").addEventListener("change", (e) => {
           s.dbPick[n] = e.target.checked;
           saveSettingsDebounced();
@@ -149,7 +152,7 @@ export async function buildPanel() {
       const row = document.createElement("label");
       row.className = "ws-item";
       const size = (localStorage.getItem(k) || "").length;
-      row.innerHTML = `<input type="checkbox" ${pickLs(s, k) ? "checked" : ""}> <span class="ws-name">${k.length > 48 ? k.slice(0, 45) + "…" : k}</span> <span class="ws-info">${fmtKB(size)}</span>`;
+      row.innerHTML = `<input type="checkbox" ${pickLs(s, k) ? "checked" : ""}> <span class="ws-name" title="${k}">${k}</span> <span class="ws-info">${fmtKB(size)}</span>`;
       row.querySelector("input").addEventListener("change", (e) => {
         s.lsPick[k] = e.target.checked;
         saveSettingsDebounced();

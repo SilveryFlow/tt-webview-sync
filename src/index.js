@@ -25,8 +25,7 @@
     // 默认排除（纯缓存/可再生）
     dbExclude: [],
     lsExclude: [],
-    blobLimitKb: 0, // 单 Blob 上限(KB)，0=不限制
-    dbLimitMb: 50, // 单库序列化后上限(MB)，超过跳过防 JS 字符串爆长(V8 约 512MB)
+    dbLimitMb: 0, // 单库上限(MB)，0=不限(压缩+分卷已覆盖大文件场景)
     lastImportedVersion: 0,
     lastExportVersion: 0,
   };
@@ -397,8 +396,6 @@
 
   // ---------- 序列化 ----------
   const skipped = [];
-  const blobLimit = () =>
-    Math.max(0, Number(getSettings()?.blobLimitKb) || 0) * 1024;
 
   function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
@@ -411,19 +408,9 @@
 
   async function serializeValue(v) {
     if (v instanceof Blob) {
-      const limit = blobLimit();
-      if (limit > 0 && v.size > limit) {
-        skipped.push(`blob ${v.size}B`);
-        return { __blobSkipped: true, size: v.size, type: v.type };
-      }
       return { __blob: true, mime: v.type, data: await blobToBase64(v) };
     }
     if (v instanceof ArrayBuffer) {
-      const limit = blobLimit();
-      if (limit > 0 && v.byteLength > limit) {
-        skipped.push(`ab ${v.byteLength}B`);
-        return { __blobSkipped: true, size: v.byteLength };
-      }
       return {
         __ab: true,
         b64: btoa(String.fromCharCode(...new Uint8Array(v))),
@@ -623,7 +610,6 @@
         exports,
         ls,
         skipped: [...skipped],
-        blobLimitKb: s.blobLimitKb,
       }),
     );
 
@@ -758,13 +744,6 @@
                 <div class="ws-list ws-lslist"></div>
               </div>
 
-              <div class="ws-options">
-                <label class="checkbox_label">
-                  <span>单文件上限(KB)</span>
-                  <input type="number" class="ws-limit text_pole" style="width:70px;" min="0">
-                </label>
-              </div>
-
             </div>
           </div>
         </div>
@@ -862,10 +841,6 @@
         : "尚无镜像（user/files 下的 wvs__ 文件）——点「导出镜像到同步」生成第一份";
     };
     refresh();
-    $(".ws-limit").value = s.blobLimitKb;
-    $(".ws-limit").addEventListener("change", (e) => {
-      s.blobLimitKb = Math.max(0, Number(e.target.value) || 0);
-    });
 
     let busy = false;
     div.addEventListener("click", async (e) => {

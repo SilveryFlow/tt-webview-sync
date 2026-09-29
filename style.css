@@ -81,26 +81,37 @@
     transparent
   );
 }
+/* 两行布局: 首行=勾选框+名称(单行省略), 次行=store清单/大小(缩进+省略)——窄屏不挤成一片 */
 #webview-sync-panel .ws-item {
   display: flex;
-  gap: 8px;
-  align-items: baseline;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
   font-size: 0.8em;
   cursor: pointer;
-  word-break: break-all;
-  line-height: 1.4;
+  line-height: 1.35;
+  padding: 1px 0;
 }
 #webview-sync-panel .ws-item:hover .ws-name {
   text-decoration: underline;
 }
+#webview-sync-panel .ws-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 #webview-sync-panel .ws-info {
+  flex: 1 0 100%;
+  order: 5;
+  box-sizing: border-box;
+  padding-left: 25px; /* 与名称文本对齐(勾选框宽度+间距) */
   opacity: 0.5;
   font-size: 0.9em;
-  margin-left: auto;
-  flex: 0 0 auto;
-}
-#webview-sync-panel .ws-name {
-  flex: 0 1 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 #webview-sync-panel .ws-list:empty::after {
   content: "(空)";

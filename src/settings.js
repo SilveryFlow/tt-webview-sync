@@ -11,7 +11,8 @@ export function getSettings() {
   const cur = es[NS];
   for (const k of Object.keys(DEFAULTS))
     if (!(k in cur)) cur[k] = JSON.parse(JSON.stringify(DEFAULTS[k]));
-  for (const k of ["mirror", "dbs", "lsPrefixes"]) delete cur[k];
+  // dbLimitMb: v0.8~v0.13 默认 50 被持久化遗留，v0.16 起整个机制移除(绝不跳过任何库)
+    for (const k of ["mirror", "dbs", "lsPrefixes", "dbLimitMb"]) delete cur[k];
   if (!cur.deviceId)
     cur.deviceId = "dev-" + Math.random().toString(36).slice(2, 8);
   return cur;

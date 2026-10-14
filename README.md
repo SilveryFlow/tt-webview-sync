@@ -65,7 +65,7 @@ https://github.com/SilveryFlow/tt-webview-sync
 - Date 类型经 JSON 序列化变 ISO 字符串（现有扩展均用时间戳，实际无感）
 - SP·数据库恢复后如配置被旧值覆盖，点一次「从镜像恢复」再刷新
 - 建议在面板勾掉 TT 前端的 `SillyTavern_Prompts`（~34MB）和 `WorldbookCacheInspectorDB`（~34MB）以减小镜像体积
-- 极端病态库（单库序列化后数百 MB）可用 `dbLimitMb` 设置做保险丝（默认 0=不限）
+- 导出不做任何体积跳过（v0.16 起连单库上限机制也移除了）：所有勾选的库全量进镜像；纯缓存类大库（如 TT 前端提示词缓存）不想要就在面板勾掉
 
 ## 排障
 

@@ -152,12 +152,6 @@ export async function exportMirror() {
       continue;
     }
     const kb = Math.round(nd.total / 1024);
-    const limitKb = Math.max(0, Number(s.dbLimitMb) || 0) * 1024;
-    if (limitKb > 0 && nd.total > limitKb * 1024) {
-      warn(`库 ${name} 序列化后 ${kb}KB 超过单库上限 ${s.dbLimitMb}MB,跳过`);
-      skipped.push(`db ${name} ${kb}KB`);
-      continue;
-    }
     log(
       "库",
       name,

@@ -17,7 +17,6 @@ export const DEFAULTS = {
   // 默认排除（纯缓存/可再生）
   dbExclude: [],
   lsExclude: [],
-  dbLimitMb: 0, // 单库上限(MB)，0=不限(流式序列化已消除大字符串瓶颈，仅作病态大库保险丝)
   lastImportedVersion: 0,
   lastExportVersion: 0,
 };
